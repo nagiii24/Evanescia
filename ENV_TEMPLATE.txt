@@ -1,0 +1,6 @@
+# Copy these lines and add them to your .env.local file
+# Replace the placeholder values with your actual values
+
+NEXT_PUBLIC_CONVEX_URL=https://your-project-name.convex.cloud
+CLERK_JWT_ISSUER_DOMAIN=https://your-app-name.clerk.accounts.dev
+CLERK_APPLICATION_ID=your_application_id_here
