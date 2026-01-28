@@ -3,8 +3,9 @@
 import { useRef, useState, useEffect } from 'react';
 import { usePlayerStore } from '@/lib/store';
 import ReactPlayer from 'react-player';
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Plus } from 'lucide-react';
 import AudioVisualizer from './AudioVisualizer';
+import { usePlaylists } from '@/components/hooks/usePlaylists';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds) || !isFinite(seconds)) return '0:00';
@@ -336,7 +337,120 @@ export default function PlayerBar() {
             {queue.length} in queue
           </div>
         )}
+
+        {/* Add to playlist (+) */}
+        <div className="ml-4 relative">
+          <AddToPlaylistButton currentSong={currentSong} />
+        </div>
       </div>
+    </div>
+  );
+}
+
+function AddToPlaylistButton({ currentSong }: { currentSong: any }) {
+  const { playlists, createPlaylist, addSongToPlaylist, enabled } = usePlaylists();
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const toggle = () => setOpen((s) => !s);
+
+  if (!currentSong) return null;
+
+  const onCreate = async () => {
+    if (!createPlaylist) return;
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const res = await createPlaylist(newName.trim(), '');
+      // After creating, try to add the song to the new playlist
+      if (addSongToPlaylist && res) {
+        setLoadingId(String(res));
+        await addSongToPlaylist(res, currentSong);
+        setLoadingId(null);
+      }
+      setNewName('');
+      setOpen(false);
+    } catch (err) {
+      console.error('Create playlist failed', err);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const onAdd = async (playlistId: any) => {
+    if (!addSongToPlaylist) return;
+    try {
+      setLoadingId(String(playlistId));
+      await addSongToPlaylist(playlistId, currentSong);
+      setLoadingId(null);
+      setOpen(false);
+    } catch (err) {
+      console.error('Add song failed', err);
+      setLoadingId(null);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={toggle}
+        className="p-2 text-sakura-deep hover:text-sakura-primary transition-colors rounded-full bg-white/10"
+        aria-label="Add to playlist"
+      >
+        <Plus size={18} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 bottom-12 w-64 bg-miko-white/95 backdrop-blur-sm border border-sakura-primary/20 rounded shadow-lg p-3 z-50">
+          <div className="text-sm font-medium text-gray-800 mb-2">Save to playlist</div>
+          <div className="max-h-40 overflow-auto">
+            {Array.isArray(playlists) && playlists.length > 0 ? (
+              playlists.map((p: any) => (
+                <button
+                  key={String(p.id || p._id || p)}
+                  className="w-full text-left py-1 px-2 hover:bg-sakura-primary/10 rounded"
+                  onClick={() => onAdd(p.id || p._id || p)}
+                  disabled={!enabled || !!loadingId}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="truncate">{p.name}</span>
+                    {loadingId && String(loadingId) === String(p.id || p._id || p) && (
+                      <span className="text-xs text-sakura-deep">Adding...</span>
+                    )}
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="text-xs text-gray-600 py-2">No playlists yet</div>
+            )}
+          </div>
+
+          <div className="mt-2 border-t pt-2">
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="New playlist"
+              className="w-full px-2 py-1 text-sm border rounded bg-white/90"
+            />
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={onCreate}
+                disabled={!createPlaylist || creating}
+                className="flex-1 bg-sakura-deep text-white text-sm py-1 rounded disabled:opacity-50"
+              >
+                {creating ? 'Creating...' : 'Create & Add'}
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                className="flex-1 border border-sakura-primary text-sm py-1 rounded"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

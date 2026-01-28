@@ -1,14 +1,23 @@
-// Temporary stub - will be replaced when you run 'npx convex dev' with Node.js v20+
-// This allows the app to compile, but Convex features won't work until real files are generated
+/* eslint-disable */
+/**
+ * Generated `api` utility.
+ *
+ * THIS CODE IS AUTOMATICALLY GENERATED.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
+ */
 
-export const api = {
-  songs: {
-    getLikes: () => {},
-    addLike: () => {},
-    removeLike: () => {},
-    isLiked: () => {},
-    getHistory: () => {},
-    addHistory: () => {},
-    clearHistory: () => {},
-  },
-};
+import { anyApi, componentsGeneric } from "convex/server";
+
+/**
+ * A utility for referencing Convex functions in your app's API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
+export const api = anyApi;
+export const internal = anyApi;
+export const components = componentsGeneric();
