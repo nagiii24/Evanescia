@@ -203,7 +203,7 @@ export default function ExplorePage() {
             {isLoading && (
               <div className="text-center py-12">
                 <Loader2 className="animate-spin mx-auto mb-4 text-cyan-400" size={48} />
-                <p className="text-gray-300">Loading {selectedArtist.name}'s music...</p>
+                <p className="text-gray-300">Loading {selectedArtist.name}&apos;s music...</p>
               </div>
             )}
 

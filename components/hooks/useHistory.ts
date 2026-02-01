@@ -55,18 +55,15 @@ export function useHistory() {
     return fn && !isStubFunction(fn) && isConvexAvailable;
   }, []);
   
-  // Get the function reference - must be stable
+  // Get the function reference - provide a safe fallback to satisfy Rules of Hooks
   const getHistoryFn = useMemo(() => {
-    return api?.songs?.getHistory;
+    return api?.songs?.getHistory || (() => []);
   }, []);
   
   const shouldSkip = !hasValidFunction || !isSignedIn;
   
-  // CRITICAL: Only call useQuery if we have a valid function reference
-  // This avoids passing stub functions to Convex hooks
-  const convexHistory = hasValidFunction && getHistoryFn
-    ? useQuery(getHistoryFn, shouldSkip ? 'skip' : { limit: 100 })
-    : undefined;
+  // Always call useQuery to satisfy Rules of Hooks; use skip option to avoid fetching when not ready
+  const convexHistory = useQuery(getHistoryFn, shouldSkip ? 'skip' : { limit: 100 });
 
   // Sync Convex data to store
   useEffect(() => {
@@ -97,16 +94,13 @@ export function useAddToHistory() {
     return fn && !isStubFunction(fn) && isConvexAvailable;
   }, []);
   
-  // Get the function reference - must be stable
+  // Get the function reference - provide safe fallback to satisfy Rules of Hooks
   const addHistoryFn = useMemo(() => {
-    return api?.songs?.addHistory;
+    return api?.songs?.addHistory || (() => {});
   }, []);
   
-  // CRITICAL: Only call useMutation if we have a valid function reference
-  // This avoids passing stub functions to Convex hooks
-  const addHistoryMutation = isValidFn && addHistoryFn
-    ? useMutation(addHistoryFn)
-    : null;
+  // Always call useMutation; only use it when isValidFn is true
+  const addHistoryMutation = useMutation(addHistoryFn);
 
   // Memoize the function to prevent infinite loops
   const addToHistory = useCallback(async (song: Song) => {

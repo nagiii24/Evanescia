@@ -92,8 +92,8 @@ export default function PlayerBar() {
     setCurrentTime(newTime);
   };
 
-  const handleSeekMouseUp = (e: React.MouseEvent<HTMLInputElement>) => {
-    const newTime = parseFloat(e.currentTarget.value);
+  const handleSeekMouseUp = (e: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
+    const newTime = parseFloat((e.currentTarget as HTMLInputElement).value);
     if (playerRef.current) {
       playerRef.current.seekTo(newTime, 'seconds');
     }

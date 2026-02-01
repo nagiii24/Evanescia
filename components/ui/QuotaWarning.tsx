@@ -33,7 +33,7 @@ export default function QuotaWarning({ error }: { error: string | null }) {
         <div className="flex-1">
           <h3 className="font-semibold text-yellow-300 mb-1">YouTube API Quota Exceeded</h3>
           <p className="text-sm text-yellow-200 mb-3">
-            You've reached the daily limit for YouTube API requests. Some features may be limited.
+            You&apos;ve reached the daily limit for YouTube API requests. Some features may be limited.
           </p>
           
           <div className="text-xs text-yellow-300/80 space-y-2 mb-3">

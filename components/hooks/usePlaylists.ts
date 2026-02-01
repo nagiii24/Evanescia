@@ -38,15 +38,15 @@ export function usePlaylists() {
   const addValid = isConvexAvailable && api?.playlists?.addSongToPlaylist && !isStubFunction(api.playlists.addSongToPlaylist);
   const removeValid = isConvexAvailable && api?.playlists?.removeSongFromPlaylist && !isStubFunction(api.playlists.removeSongFromPlaylist);
 
-  const getListsFn = useMemo(() => (getListsValid ? api.playlists.getUserPlaylists : null), [getListsValid]);
-  const createFn = useMemo(() => (createValid ? api.playlists.createPlaylist : null), [createValid]);
-  const addFn = useMemo(() => (addValid ? api.playlists.addSongToPlaylist : null), [addValid]);
-  const removeFn = useMemo(() => (removeValid ? api.playlists.removeSongFromPlaylist : null), [removeValid]);
+  const getListsFn = useMemo(() => api.playlists.getUserPlaylists || (() => []), []);
+  const createFn = useMemo(() => api.playlists.createPlaylist || (() => {}), []);
+  const addFn = useMemo(() => api.playlists.addSongToPlaylist || (() => {}), []);
+  const removeFn = useMemo(() => api.playlists.removeSongFromPlaylist || (() => {}), []);
 
-  const getListsQuery = getListsValid && getListsFn ? useQuery(getListsFn) : undefined;
-  const createMutation = createValid && createFn ? useMutation(createFn) : null;
-  const addMutation = addValid && addFn ? useMutation(addFn) : null;
-  const removeMutation = removeValid && removeFn ? useMutation(removeFn) : null;
+  const getListsQuery = useQuery(getListsFn);
+  const createMutation = useMutation(createFn);
+  const addMutation = useMutation(addFn);
+  const removeMutation = useMutation(removeFn);
 
   // Public API
   async function createPlaylist(name: string, description?: string) {
@@ -73,9 +73,9 @@ export function usePlaylists() {
 
   return {
     playlists: getListsQuery || [],
-    createPlaylist: createMutation ? createPlaylist : null,
-    addSongToPlaylist: addMutation ? addSongToPlaylist : null,
-    removeSongFromPlaylist: removeMutation ? removeSongFromPlaylist : null,
-    enabled: !!(getListsQuery || createMutation || addMutation),
+    createPlaylist: createValid ? createPlaylist : null,
+    addSongToPlaylist: addValid ? addSongToPlaylist : null,
+    removeSongFromPlaylist: removeValid ? removeSongFromPlaylist : null,
+    enabled: !!(getListsValid || createValid || addValid || removeValid),
   };
 }

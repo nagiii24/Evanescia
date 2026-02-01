@@ -103,14 +103,14 @@ export async function searchYoutube(query: string): Promise<Song[]> {
     // Step 4: Map to Song type and filter by duration (max 15 minutes)
     const MAX_DURATION = 15 * 60; // 15 minutes in seconds
     const songs: Song[] = videoData
-      .map((video) => ({
+      .map((video: any) => ({
         id: video.id,
         title: video.title,
         artist: video.artist,
         thumbnailUrl: video.thumbnailUrl,
         duration: durationMap.get(video.id) || 0,
       }))
-      .filter((song) => song.duration > 0 && song.duration <= MAX_DURATION);
+      .filter((song: Song) => song.duration > 0 && song.duration <= MAX_DURATION);
 
     // Cache the results
     setCache(cacheKey, songs);
@@ -171,15 +171,15 @@ export async function getRelatedVideos(videoId: string): Promise<Song[]> {
     // Step 4: Map to Song type and filter by duration (max 15 minutes)
     const MAX_DURATION = 15 * 60; // 15 minutes in seconds
     const songs: Song[] = videoData
-      .map((video) => ({
+      .map((video: any) => ({
         id: video.id,
         title: video.title,
         artist: video.artist,
         thumbnailUrl: video.thumbnailUrl,
         duration: durationMap.get(video.id) || 0,
       }))
-      .filter((song) => song.duration > 0 && song.duration <= MAX_DURATION)
-      .filter((song) => song.id !== videoId); // Filter out the current video itself
+      .filter((song: Song) => song.duration > 0 && song.duration <= MAX_DURATION)
+      .filter((song: Song) => song.id !== videoId); // Filter out the current video itself
 
     // Cache the results
     setCache(cacheKey, songs);
@@ -241,14 +241,14 @@ export async function getArtistSongs(artistName: string): Promise<Song[]> {
     const MIN_DURATION = 120; // Minimum 2 minutes
     const MAX_DURATION = 15 * 60; // Maximum 15 minutes
     const songs: Song[] = videoData
-      .map((video) => ({
+      .map((video: any) => ({
         id: video.id,
         title: video.title,
         artist: video.artist,
         thumbnailUrl: video.thumbnailUrl,
         duration: durationMap.get(video.id) || 0,
       }))
-      .filter((song) => song.duration >= MIN_DURATION && song.duration <= MAX_DURATION);
+      .filter((song: Song) => song.duration >= MIN_DURATION && song.duration <= MAX_DURATION);
 
     // Cache the results
     setCache(cacheKey, songs);

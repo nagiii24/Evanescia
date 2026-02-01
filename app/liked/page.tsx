@@ -43,7 +43,7 @@ export default function LikedSongs() {
         {likedSongs.length === 0 ? (
           <div className="text-center text-gray-300 mt-12">
             <Heart size={48} className="mx-auto mb-4 opacity-50" />
-            <p>You haven't liked any songs yet.</p>
+            <p>You haven&apos;t liked any songs yet.</p>
             <p className="text-sm text-gray-400 mt-2">Start exploring and like your favorite songs!</p>
           </div>
         ) : (

@@ -55,24 +55,15 @@ export function useLikedSongs() {
   }, []);
   
   // Get the function reference - must be stable
-  // We'll always pass a function, but it might be a stub
+  // Get the function reference - provide a stable fallback
   const getLikesFn = useMemo(() => {
-    return api?.songs?.getLikes || (() => {});
+    return api?.songs?.getLikes || (() => []);
   }, []);
   
-  // CRITICAL: We must always call useQuery to satisfy Rules of Hooks
-  // However, Convex will throw an error if we pass a stub function
-  // The solution: Only call useQuery if we have a valid function reference
-  // This is a necessary violation of Rules of Hooks to avoid runtime errors
-  // The alternative would be to restructure the app to conditionally render components
   const shouldSkip = !hasValidFunction || !isSignedIn;
   
-  // Conditionally call useQuery - this is the only safe way to avoid the error
-  // when Convex isn't configured. In a production app, you'd want to ensure
-  // Convex is always properly configured, or restructure to avoid this pattern.
-  const convexLikedSongs = hasValidFunction && getLikesFn
-    ? useQuery(getLikesFn, shouldSkip ? 'skip' : undefined)
-    : undefined;
+  // Always call useQuery; use skip option to avoid fetching when not ready
+  const convexLikedSongs = useQuery(getLikesFn, shouldSkip ? 'skip' : undefined);
 
   // Sync Convex data to store
   useEffect(() => {
@@ -94,25 +85,18 @@ export function useLikeSong() {
   const addLikeIsValid = isConvexAvailable && api?.songs?.addLike && !isStubFunction(api.songs.addLike);
   const removeLikeIsValid = isConvexAvailable && api?.songs?.removeLike && !isStubFunction(api.songs.removeLike);
   
-  // Get function references - only if valid
+  // Get function references - provide safe fallbacks so hooks can be called unconditionally
   const addLikeFn = useMemo(() => {
-    return addLikeIsValid ? api.songs.addLike : null;
-  }, [addLikeIsValid]);
+    return api?.songs?.addLike || (() => {});
+  }, []);
   
   const removeLikeFn = useMemo(() => {
-    return removeLikeIsValid ? api.songs.removeLike : null;
-  }, [removeLikeIsValid]);
+    return api?.songs?.removeLike || (() => {});
+  }, []);
   
-  // CRITICAL: We must always call useMutation to satisfy Rules of Hooks
-  // However, Convex will throw an error if we pass stub functions
-  // The solution: Only call useMutation if we have valid function references
-  // This is a necessary violation of Rules of Hooks to avoid runtime errors
-  const addLikeMutation = addLikeIsValid && addLikeFn 
-    ? useMutation(addLikeFn) 
-    : null;
-  const removeLikeMutation = removeLikeIsValid && removeLikeFn 
-    ? useMutation(removeLikeFn) 
-    : null;
+  // Always call useMutation; only invoke them when the corresponding valid flags are true
+  const addLikeMutation = useMutation(addLikeFn);
+  const removeLikeMutation = useMutation(removeLikeFn);
 
   const toggleLike = async (song: Song) => {
     if (!isSignedIn) return;

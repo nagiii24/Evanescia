@@ -8,7 +8,7 @@ import { Home, Search, Compass, Heart, History, ListMusic, Mic2, Settings, Menu,
 interface NavItem {
   href: string;
   label: string;
-  icon: React.ComponentType<{ size?: number }>;
+  icon: React.ComponentType<any>;
   accent?: boolean;
 }
 

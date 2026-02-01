@@ -41,7 +41,7 @@ export default function RecentPage() {
         {history.length === 0 ? (
           <div className="text-center text-gray-300 mt-12">
             <Music size={48} className="mx-auto mb-4 opacity-50" />
-            <p>You haven't played any songs yet.</p>
+            <p>You haven&apos;t played any songs yet.</p>
             <p className="text-sm text-gray-400 mt-2">Start playing music to see your history here!</p>
           </div>
         ) : (
