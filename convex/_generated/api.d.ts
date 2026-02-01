@@ -1,24 +1,51 @@
-// Temporary stub - will be replaced when you run 'npx convex dev' with Node.js v20+
-// This allows the app to compile, but Convex features won't work until real files are generated
+/* eslint-disable */
+/**
+ * Generated `api` utility.
+ *
+ * THIS CODE IS AUTOMATICALLY GENERATED.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
+ */
 
-export const api: {
-  songs: {
-    getLikes: (args?: any) => any;
-    addLike: (args?: any) => any;
-    removeLike: (args?: any) => any;
-    isLiked: (args?: any) => any;
-    getHistory: (args?: any) => any;
-    addHistory: (args?: any) => any;
-    clearHistory: (args?: any) => any;
-  };
-} = {
-  songs: {
-    getLikes: () => {},
-    addLike: () => {},
-    removeLike: () => {},
-    isLiked: () => {},
-    getHistory: () => {},
-    addHistory: () => {},
-    clearHistory: () => {},
-  },
-} as any;
+import type * as playlists from "../playlists.js";
+import type * as songs from "../songs.js";
+
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+
+declare const fullApi: ApiFromModules<{
+  playlists: typeof playlists;
+  songs: typeof songs;
+}>;
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
+export declare const api: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
+export declare const internal: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;
+
+export declare const components: {};
