@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getUserId } from "./songs";
+import { getExistingUserIdOrNull, getUserId } from "./songs";
 
 // Create a new playlist for the current user
 export const createPlaylist = mutation({
@@ -97,7 +97,10 @@ export const getPlaylistSongs = query({
     playlistId: v.id("playlists"),
   },
   handler: async (ctx, args) => {
-    const userId = await getUserId(ctx);
+    const userId = await getExistingUserIdOrNull(ctx);
+    if (!userId) {
+      return [];
+    }
     const playlist = await ctx.db.get(args.playlistId);
     if (!playlist || String(playlist.userId) !== String(userId)) {
       return [];
@@ -123,7 +126,10 @@ export const getPlaylistSongs = query({
 // Get playlists for current user
 export const getUserPlaylists = query({
   handler: async (ctx) => {
-    const userId = await getUserId(ctx);
+    const userId = await getExistingUserIdOrNull(ctx);
+    if (!userId) {
+      return [];
+    }
 
     const lists = await ctx.db
       .query("playlists")

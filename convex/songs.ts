@@ -2,13 +2,30 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
 /**
- * Resolve Convex user id from a single identity read (find or create users row).
- * Returns null if unauthenticated or missing subject — use for read queries that should not throw.
+ * Read-only: existing users row for this Clerk identity.
+ * Queries must use this — Convex queries cannot call db.insert().
  */
-export async function getUserIdOrNull(ctx: any): Promise<any | null> {
+export async function getExistingUserIdOrNull(ctx: any): Promise<any | null> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity?.subject) {
     return null;
+  }
+
+  const existingUser = await ctx.db
+    .query("users")
+    .withIndex("by_clerkId", (q: any) => q.eq("clerkId", identity.subject))
+    .first();
+
+  return existingUser?._id ?? null;
+}
+
+/**
+ * Mutations only: find or create users row (insert allowed).
+ */
+export async function getUserId(ctx: any) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity?.subject) {
+    throw new Error("Not authenticated");
   }
 
   const existingUser = await ctx.db
@@ -25,15 +42,6 @@ export async function getUserIdOrNull(ctx: any): Promise<any | null> {
     name: identity.name || "User",
     email: identity.email || "",
   });
-}
-
-/** Mutations: require a logged-in user with a valid subject. */
-export async function getUserId(ctx: any) {
-  const id = await getUserIdOrNull(ctx);
-  if (!id) {
-    throw new Error("Not authenticated");
-  }
-  return id;
 }
 
 // Add a liked song
@@ -96,7 +104,7 @@ export const removeLike = mutation({
 // Get all liked songs for current user
 export const getLikes = query({
   handler: async (ctx) => {
-    const userId = await getUserIdOrNull(ctx);
+    const userId = await getExistingUserIdOrNull(ctx);
     if (!userId) {
       return [];
     }
@@ -122,7 +130,7 @@ export const isLiked = query({
     songId: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await getUserIdOrNull(ctx);
+    const userId = await getExistingUserIdOrNull(ctx);
     if (!userId) {
       return false;
     }
@@ -183,7 +191,7 @@ export const getHistory = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await getUserIdOrNull(ctx);
+    const userId = await getExistingUserIdOrNull(ctx);
     if (!userId) {
       return [];
     }
