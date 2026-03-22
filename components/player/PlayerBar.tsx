@@ -460,9 +460,10 @@ function AddToPlaylistButton({ currentSong }: { currentSong: any }) {
             ) : playlistBackendHelp.kind === 'convex_auth_setup' ? (
               <div className="text-xs text-gray-600 mt-1 leading-snug">
                 Convex isn&apos;t receiving your sign-in. In Clerk, add a JWT template named{' '}
-                <code className="text-gray-500">convex</code>, and set Convex dashboard env vars
-                for <code className="text-gray-500">CLERK_JWT_ISSUER_DOMAIN</code> and{' '}
-                <code className="text-gray-500">CLERK_APPLICATION_ID</code>. See{' '}
+                <code className="text-gray-500">convex</code>. In the Convex dashboard, set{' '}
+                <code className="text-gray-500">CLERK_JWT_ISSUER_DOMAIN</code> to your Clerk Frontend
+                API URL (same host as <code className="text-gray-500">*.clerk.accounts.dev</code>).
+                Then run <code className="text-gray-500">npx convex deploy</code>. See{' '}
                 <a
                   href="https://docs.convex.dev/auth/clerk"
                   className="text-cyan-600 underline"
