@@ -6,11 +6,22 @@ function isValidSongId(song: Song | null | undefined): boolean {
   return typeof song?.id === 'string' && /^[A-Za-z0-9_-]{6,}$/.test(song.id);
 }
 
+function shuffleSongs(songs: Song[]): Song[] {
+  const out = [...songs];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 interface PlayerStore extends PlayerState {
   // Actions
   setSong: (song: Song) => void;
   /** Play one track from a list and queue the rest (playlist / ordered playback). */
   playPlaylistFrom: (songs: Song[], startIndex: number) => void;
+  /** Shuffle valid tracks, then play with playlist-only queue (no related videos after). */
+  playPlaylistShuffled: (songs: Song[]) => void;
   togglePlay: () => void;
   addToQueue: (song: Song) => void;
   playNext: () => Promise<void>;
@@ -112,6 +123,36 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       currentSong: song,
       isPlaying: true,
       queue: tail,
+      playlistOnly: true,
+      currentTime: 0,
+    });
+  },
+
+  playPlaylistShuffled: (songs: Song[]) => {
+    if (!Array.isArray(songs) || songs.length === 0) {
+      return;
+    }
+    const valid = songs.filter((s) => isValidSongId(s));
+    if (valid.length === 0) {
+      return;
+    }
+    const shuffled = shuffleSongs(valid);
+    const [first, ...rest] = shuffled;
+
+    const currentSong = get().currentSong;
+    const { onHistoryAdd } = get();
+    if (currentSong) {
+      const newHistory = [currentSong, ...get().history.filter(s => s.id !== currentSong.id)].slice(0, 100);
+      set({ history: newHistory });
+      if (onHistoryAdd) {
+        onHistoryAdd(currentSong);
+      }
+    }
+
+    set({
+      currentSong: first,
+      isPlaying: true,
+      queue: rest,
       playlistOnly: true,
       currentTime: 0,
     });
