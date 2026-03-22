@@ -478,13 +478,14 @@ function AddToPlaylistButton({ currentSong }: { currentSong: any }) {
                   <code className="text-gray-500">{`{"aud":"convex"}`}</code>.
                 </p>
                 <p>
-                  Convex env: <code className="text-gray-500">CLERK_JWT_ISSUER_DOMAIN</code> = template
-                  Issuer. If <code className="text-gray-500">aud</code> on{' '}
+                  Convex env: <code className="text-gray-500">CLERK_JWT_ISSUER_DOMAIN</code> = template Issuer.
+                  If <code className="text-gray-500">aud</code> on{' '}
                   <a href="https://jwt.io" className="text-cyan-600 underline" target="_blank" rel="noreferrer">
                     jwt.io
                   </a>{' '}
-                  is not <code className="text-gray-500">convex</code>, set Convex env{' '}
-                  <code className="text-gray-500">CLERK_JWT_AUDIENCE</code> to that exact value, then{' '}
+                  is not <code className="text-gray-500">convex</code>, fix the Clerk template (or change{' '}
+                  <code className="text-gray-500">applicationID</code> in{' '}
+                  <code className="text-gray-500">convex/auth.config.ts</code> to match <code className="text-gray-500">aud</code>), then{' '}
                   <code className="text-gray-500">npx convex deploy</code>.
                 </p>
               </div>

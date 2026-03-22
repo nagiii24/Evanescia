@@ -1,20 +1,17 @@
 import type { AuthConfig } from "convex/server";
 
 // Convex + Clerk: https://docs.convex.dev/auth/clerk
-// Convex dashboard (this deployment):
-//   CLERK_JWT_ISSUER_DOMAIN = Clerk JWT template "Issuer" (Frontend API URL)
-// Optional if your JWT's `aud` claim is not the string "convex" (decode at https://jwt.io ):
-//   CLERK_JWT_AUDIENCE = exact aud value from the token
+// Convex dashboard: CLERK_JWT_ISSUER_DOMAIN = Clerk JWT template Issuer (Frontend API URL).
+// applicationID must match JWT `aud` (usually "convex"). Do not use process.env for audience —
+// Convex requires every env var referenced here to exist in the dashboard.
+// If your token's `aud` differs (see jwt.io), change the string below and redeploy.
 //
-// Clerk: activate https://dashboard.clerk.com/apps/setup/convex so `aud` is pre-mapped for Convex,
-// or in your manual "convex" template add claims JSON: { "aud": "convex" }
-const audience = process.env.CLERK_JWT_AUDIENCE || "convex";
-
+// Clerk: https://dashboard.clerk.com/apps/setup/convex — or add claims { "aud": "convex" } on your template.
 export default {
   providers: [
     {
       domain: process.env.CLERK_JWT_ISSUER_DOMAIN || "",
-      applicationID: audience,
+      applicationID: "convex",
     },
   ],
 } satisfies AuthConfig;
