@@ -4,10 +4,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { useMemo } from 'react';
 import type { Song } from '@/types';
 import { isConvexFunctionRef } from '@/lib/convexFunctionRef';
-import {
-  useConvexUserLinkState,
-  useConvexUserQueryReady,
-} from '@/lib/useConvexUserQueryReady';
+import { useConvexUserLinkState } from '@/lib/useConvexUserQueryReady';
 
 // Try to load generated Convex API; fall back to stubs if not available
 let api: any;
@@ -33,8 +30,25 @@ try {
   isConvexAvailable = false;
 }
 
+export type PlaylistBackendHelp =
+  | { kind: 'ok' }
+  | { kind: 'clerk_loading' }
+  | { kind: 'missing_convex_url' }
+  | { kind: 'convex_connecting' }
+  | { kind: 'convex_auth_setup' };
+
 export function usePlaylists() {
-  const convexUserReady = useConvexUserQueryReady();
+  const link = useConvexUserLinkState();
+  const convexUserReady = link.ready;
+
+  const playlistBackendHelp: PlaylistBackendHelp = useMemo(() => {
+    if (!isConvexAvailable) return { kind: 'missing_convex_url' };
+    if (!link.clerkLoaded) return { kind: 'clerk_loading' };
+    if (!link.signedIn) return { kind: 'ok' };
+    if (link.convexAuthLoading) return { kind: 'convex_connecting' };
+    if (!link.convexAuthenticated) return { kind: 'convex_auth_setup' };
+    return { kind: 'ok' };
+  }, [link.clerkLoaded, link.signedIn, link.convexAuthLoading, link.convexAuthenticated]);
 
   const getListsValid =
     isConvexAvailable && isConvexFunctionRef(api?.playlists?.getUserPlaylists);
@@ -43,28 +57,23 @@ export function usePlaylists() {
   const removeValid =
     isConvexAvailable && isConvexFunctionRef(api?.playlists?.removeSongFromPlaylist);
 
-  const getListsFn = useMemo(() => (getListsValid ? api.playlists.getUserPlaylists : null), [getListsValid]);
-  const createFn = useMemo(() => (createValid ? api.playlists.createPlaylist : null), [createValid]);
-  const addFn = useMemo(() => (addValid ? api.playlists.addSongToPlaylist : null), [addValid]);
-  const removeFn = useMemo(() => (removeValid ? api.playlists.removeSongFromPlaylist : null), [removeValid]);
+  const getUserPlaylistsRef = useMemo(() => api.playlists.getUserPlaylists, []);
+  const createPlaylistRef = useMemo(() => api.playlists.createPlaylist, []);
+  const addSongRef = useMemo(() => api.playlists.addSongToPlaylist, []);
+  const removeSongRef = useMemo(() => api.playlists.removeSongFromPlaylist, []);
 
-  const skipPlaylists = !convexUserReady;
-  const getListsQuery =
-    getListsValid && getListsFn
-      ? useQuery(getListsFn, skipPlaylists ? 'skip' : undefined)
-      : undefined;
-  const createMutation = createValid && createFn ? useMutation(createFn) : null;
-  const addMutation = addValid && addFn ? useMutation(addFn) : null;
-  const removeMutation = removeValid && removeFn ? useMutation(removeFn) : null;
+  const skipListQuery = !getListsValid || !convexUserReady;
+  const getListsQuery = useQuery(getUserPlaylistsRef, skipListQuery ? 'skip' : undefined);
 
-  // Public API
+  const createMutation = useMutation(createPlaylistRef);
+  const addMutation = useMutation(addSongRef);
+  const removeMutation = useMutation(removeSongRef);
+
   async function createPlaylist(name: string, description?: string) {
-    if (!createMutation) throw new Error('Convex createPlaylist not available');
     return await createMutation({ name, description });
   }
 
   async function addSongToPlaylist(playlistId: any, song: Song) {
-    if (!addMutation) throw new Error('Convex addSongToPlaylist not available');
     return await addMutation({
       playlistId,
       songId: song.id,
@@ -76,41 +85,34 @@ export function usePlaylists() {
   }
 
   async function removeSongFromPlaylist(playlistId: any, songId: string) {
-    if (!removeMutation) throw new Error('Convex removeSongFromPlaylist not available');
     return await removeMutation({ playlistId, songId });
   }
 
   return {
     playlists: getListsQuery || [],
-    createPlaylist:
-      convexUserReady && createMutation ? createPlaylist : null,
-    addSongToPlaylist:
-      convexUserReady && addMutation ? addSongToPlaylist : null,
+    createPlaylist: convexUserReady && createValid ? createPlaylist : null,
+    addSongToPlaylist: convexUserReady && addValid ? addSongToPlaylist : null,
     removeSongFromPlaylist:
-      convexUserReady && removeMutation ? removeSongFromPlaylist : null,
-    enabled:
-      convexUserReady && !!(createMutation || addMutation || getListsQuery !== undefined),
-    /** Why playlist actions may be disabled (for UI copy when signed in). */
+      convexUserReady && removeValid ? removeSongFromPlaylist : null,
+    enabled: convexUserReady && (getListsValid || createValid || addValid),
     playlistBackendHelp,
   };
 }
 
 /** Songs inside one playlist; skips when signed out or playlistId is null. */
 export function usePlaylistSongs(playlistId: string | null) {
-  const convexUserReady = useConvexUserQueryReady();
+  const link = useConvexUserLinkState();
+  const convexUserReady = link.ready;
 
   const songsValid =
     isConvexAvailable && isConvexFunctionRef(api?.playlists?.getPlaylistSongs);
-  const getSongsFn = useMemo(
-    () => (songsValid ? api.playlists.getPlaylistSongs : null),
-    [songsValid],
-  );
+  const getPlaylistSongsRef = useMemo(() => api.playlists.getPlaylistSongs, []);
 
   const skip = !convexUserReady || !playlistId || !songsValid;
-  const songsQuery =
-    songsValid && getSongsFn
-      ? useQuery(getSongsFn, skip ? 'skip' : { playlistId: playlistId as any })
-      : undefined;
+  const songsQuery = useQuery(
+    getPlaylistSongsRef,
+    skip ? 'skip' : { playlistId: playlistId as any },
+  );
 
   const isLoading = !skip && songsQuery === undefined;
   return {
