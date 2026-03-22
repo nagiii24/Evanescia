@@ -2,9 +2,15 @@ import { create } from 'zustand';
 import type { Song, PlayerState } from '@/types';
 import { getRelatedVideos, searchYoutube } from '@/lib/youtube';
 
+function isValidSongId(song: Song | null | undefined): boolean {
+  return typeof song?.id === 'string' && /^[A-Za-z0-9_-]{6,}$/.test(song.id);
+}
+
 interface PlayerStore extends PlayerState {
   // Actions
   setSong: (song: Song) => void;
+  /** Play one track from a list and queue the rest (playlist / ordered playback). */
+  playPlaylistFrom: (songs: Song[], startIndex: number) => void;
   togglePlay: () => void;
   addToQueue: (song: Song) => void;
   playNext: () => Promise<void>;
@@ -29,6 +35,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   isPlaying: false,
   currentSong: null,
   queue: [],
+  playlistOnly: false,
   volume: 1,
   isMinimized: false,
   duration: 0,
@@ -51,9 +58,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
   // Actions
   setSong: (song: Song) => {
-    // Validate incoming song id to avoid malformed URLs or runtime errors in the player
-    const idOk = typeof song?.id === 'string' && /^[A-Za-z0-9_-]{6,}$/.test(song.id);
-    if (!idOk) {
+    if (!isValidSongId(song)) {
       console.error('setSong called with invalid song id, ignoring:', song);
       return;
     }
@@ -77,7 +82,38 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       isPlaying: true,
       // Clear queue when manually selecting a new song to ensure fresh related content
       queue: [],
+      playlistOnly: false,
       currentTime: 0, // Reset time for new song
+    });
+  },
+
+  playPlaylistFrom: (songs: Song[], startIndex: number) => {
+    if (!Array.isArray(songs) || startIndex < 0 || startIndex >= songs.length) {
+      return;
+    }
+    const song = songs[startIndex];
+    if (!isValidSongId(song)) {
+      console.error('playPlaylistFrom: invalid song at index', startIndex);
+      return;
+    }
+    const tail = songs.slice(startIndex + 1).filter((s) => isValidSongId(s));
+
+    const currentSong = get().currentSong;
+    const { onHistoryAdd } = get();
+    if (currentSong) {
+      const newHistory = [currentSong, ...get().history.filter(s => s.id !== currentSong.id)].slice(0, 100);
+      set({ history: newHistory });
+      if (onHistoryAdd) {
+        onHistoryAdd(currentSong);
+      }
+    }
+
+    set({
+      currentSong: song,
+      isPlaying: true,
+      queue: tail,
+      playlistOnly: true,
+      currentTime: 0,
     });
   },
 
@@ -118,6 +154,20 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         isPlaying: true,
         currentTime: 0, // Reset time for new song
       });
+      return;
+    }
+
+    // Playlist playback: do not auto-fill with YouTube related videos
+    if (get().playlistOnly) {
+      const { onHistoryAdd } = get();
+      if (currentSong) {
+        const newHistory = [currentSong, ...get().history.filter(s => s.id !== currentSong.id)].slice(0, 100);
+        set({ history: newHistory });
+        if (onHistoryAdd) {
+          onHistoryAdd(currentSong);
+        }
+      }
+      set({ isPlaying: false, playlistOnly: false, currentTime: 0 });
       return;
     }
 

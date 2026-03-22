@@ -16,7 +16,7 @@ function formatDuration(seconds: number): string {
 export default function PlaylistsPage() {
   const { isSignedIn, isLoaded } = useUser();
   const { playlists, createPlaylist } = usePlaylists();
-  const { setSong } = usePlayerStore();
+  const { playPlaylistFrom } = usePlayerStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -136,9 +136,21 @@ export default function PlaylistsPage() {
               </div>
             ) : (
               <>
-                <h2 className="text-2xl font-semibold text-white mb-2 truncate">
-                  {selectedPlaylist?.name ?? 'Playlist'}
-                </h2>
+                <div className="flex flex-wrap items-center gap-3 mb-2">
+                  <h2 className="text-2xl font-semibold text-white truncate min-w-0 flex-1">
+                    {selectedPlaylist?.name ?? 'Playlist'}
+                  </h2>
+                  {!isLoading && songs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => playPlaylistFrom(songs, 0)}
+                      className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-500 transition-colors"
+                    >
+                      <Play size={18} fill="currentColor" />
+                      Play all
+                    </button>
+                  )}
+                </div>
                 <p className="text-gray-400 text-sm mb-6">
                   {isLoading ? 'Loading…' : `${songs.length} song${songs.length === 1 ? '' : 's'}`}
                 </p>
@@ -149,7 +161,7 @@ export default function PlaylistsPage() {
                   <div className="space-y-2">
                     {songs.map((song: Song & { addedAt?: number }, index: number) => (
                       <div
-                        key={`${song.id}-${index}`}
+                        key={`${song.id}-${song.addedAt ?? index}`}
                         className="flex items-center gap-4 p-3 bg-black/40 backdrop-blur-md border border-white/10 rounded-lg hover:bg-black/50 hover:border-white/20 transition-all group"
                       >
                         <span className="text-gray-400 w-8 text-sm">{index + 1}</span>
@@ -167,7 +179,7 @@ export default function PlaylistsPage() {
                         )}
                         <button
                           type="button"
-                          onClick={() => setSong(song)}
+                          onClick={() => playPlaylistFrom(songs, index)}
                           className="p-2 text-cyan-400 hover:text-cyan-300 opacity-0 group-hover:opacity-100 transition-opacity"
                           aria-label={`Play ${song.title}`}
                         >
