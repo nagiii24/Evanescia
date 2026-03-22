@@ -91,12 +91,18 @@ export const removeSongFromPlaylist = mutation({
   },
 });
 
-// Get songs for a playlist
+// Get songs for a playlist (only if it belongs to the current user)
 export const getPlaylistSongs = query({
   args: {
     playlistId: v.id("playlists"),
   },
   handler: async (ctx, args) => {
+    const userId = await getUserId(ctx);
+    const playlist = await ctx.db.get(args.playlistId);
+    if (!playlist || String(playlist.userId) !== String(userId)) {
+      return [];
+    }
+
     const items = await ctx.db
       .query("playlistItems")
       .withIndex("by_playlistId", (q: any) => q.eq("playlistId", args.playlistId))

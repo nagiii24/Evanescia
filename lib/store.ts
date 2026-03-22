@@ -51,6 +51,13 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
   // Actions
   setSong: (song: Song) => {
+    // Validate incoming song id to avoid malformed URLs or runtime errors in the player
+    const idOk = typeof song?.id === 'string' && /^[A-Za-z0-9_-]{6,}$/.test(song.id);
+    if (!idOk) {
+      console.error('setSong called with invalid song id, ignoring:', song);
+      return;
+    }
+
     const currentSong = get().currentSong;
     const { onHistoryAdd } = get();
     

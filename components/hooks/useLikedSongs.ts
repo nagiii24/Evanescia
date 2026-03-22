@@ -5,34 +5,19 @@ import { usePlayerStore } from '@/lib/store';
 import { useEffect, useMemo } from 'react';
 import { useUser } from '@clerk/nextjs';
 import type { Song } from '@/types';
+import { isConvexFunctionRef } from '@/lib/convexFunctionRef';
+import { useConvexUserQueryReady } from '@/lib/useConvexUserQueryReady';
 
 // Import Convex API - will use stub if not available
 let api: any;
 let isConvexAvailable = false;
 
-// Helper to detect if we're using stub functions
-function isStubFunction(fn: any): boolean {
-  if (!fn || typeof fn !== 'function') return true;
-  // Stub functions are empty arrow functions with no properties
-  // Check if the function stringifies to '() => {}' or similar
-  const fnStr = fn.toString().trim();
-  // Match various forms of empty functions: '() => {}', 'function(){}', etc.
-  const isEmptyFunction = /^\s*\(\)\s*=>\s*\{\}\s*$/.test(fnStr) || 
-                          /^\s*function\s*\(\s*\)\s*\{\}\s*$/.test(fnStr) ||
-                          fnStr === '() => {}' ||
-                          fnStr === 'function () {}';
-  return isEmptyFunction;
-}
-
 try {
   api = require('@/convex/_generated/api').api;
-  // Check if we're using stub functions or if Convex URL is configured
-  // If any function is a stub, Convex isn't properly set up
-  const hasStubs = isStubFunction(api?.songs?.getLikes) || 
-                   isStubFunction(api?.songs?.addLike);
-  // Also check if Convex URL is configured (available at build time)
+  const likesReady =
+    isConvexFunctionRef(api?.songs?.getLikes) && isConvexFunctionRef(api?.songs?.addLike);
   const hasConvexUrl = typeof process !== 'undefined' && !!process.env.NEXT_PUBLIC_CONVEX_URL;
-  isConvexAvailable = !hasStubs && hasConvexUrl;
+  isConvexAvailable = likesReady && hasConvexUrl;
 } catch {
   // Using stub API - Convex is not available
   api = {
@@ -47,11 +32,12 @@ try {
 
 export function useLikedSongs() {
   const { isSignedIn } = useUser();
+  const convexUserReady = useConvexUserQueryReady();
   const { likedSongs, setLikedSongs } = usePlayerStore();
   
   // Check if we have a valid Convex function (not a stub)
   const hasValidFunction = useMemo(() => {
-    return isConvexAvailable && api?.songs?.getLikes && !isStubFunction(api.songs.getLikes);
+    return isConvexAvailable && isConvexFunctionRef(api?.songs?.getLikes);
   }, []);
   
   // Get the function reference - must be stable
@@ -60,7 +46,7 @@ export function useLikedSongs() {
     return api?.songs?.getLikes || (() => []);
   }, []);
   
-  const shouldSkip = !hasValidFunction || !isSignedIn;
+  const shouldSkip = !hasValidFunction || !convexUserReady;
   
   // Always call useQuery; use skip option to avoid fetching when not ready
   const convexLikedSongs = useQuery(getLikesFn, shouldSkip ? 'skip' : undefined);
@@ -79,11 +65,12 @@ export function useLikedSongs() {
 
 export function useLikeSong() {
   const { isSignedIn } = useUser();
+  const convexUserReady = useConvexUserQueryReady();
   const { likedSongs, setLikedSongs } = usePlayerStore();
 
   // Check if we have valid Convex functions (not stubs) at module level
-  const addLikeIsValid = isConvexAvailable && api?.songs?.addLike && !isStubFunction(api.songs.addLike);
-  const removeLikeIsValid = isConvexAvailable && api?.songs?.removeLike && !isStubFunction(api.songs.removeLike);
+  const addLikeIsValid = isConvexAvailable && isConvexFunctionRef(api?.songs?.addLike);
+  const removeLikeIsValid = isConvexAvailable && isConvexFunctionRef(api?.songs?.removeLike);
   
   // Get function references - provide safe fallbacks so hooks can be called unconditionally
   const addLikeFn = useMemo(() => {
@@ -99,7 +86,7 @@ export function useLikeSong() {
   const removeLikeMutation = useMutation(removeLikeFn);
 
   const toggleLike = async (song: Song) => {
-    if (!isSignedIn) return;
+    if (!isSignedIn || !convexUserReady) return;
 
     const isCurrentlyLiked = likedSongs.some(s => s.id === song.id);
     

@@ -8,6 +8,8 @@ import NavBar from "@/components/navigation/NavBar";
 import HeaderAuth from "@/components/layout/HeaderAuth";
 import LikedSongsSync from "@/components/layout/LikedSongsSync";
 import SakuraDrop from "@/components/ui/SakuraDrop";
+import ErrorLogger from "@/components/ErrorLogger";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { Playfair_Display } from "next/font/google";
 
 const playfair = Playfair_Display({
@@ -40,9 +42,12 @@ export default function RootLayout({
             <SakuraDrop />
             <NavBar />
             <HeaderAuth />
-            <LikedSongsSync />
-            {children}
-            <PlayerBar />
+            <ErrorBoundary>
+              <LikedSongsSync />
+              {children}
+              <PlayerBar />
+            </ErrorBoundary>
+            <ErrorLogger />
           </body>
         </html>
       </ConvexClientProvider>

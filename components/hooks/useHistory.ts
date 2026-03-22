@@ -5,34 +5,19 @@ import { usePlayerStore } from '@/lib/store';
 import { useEffect, useCallback, useMemo } from 'react';
 import { useUser } from '@clerk/nextjs';
 import type { Song } from '@/types';
+import { isConvexFunctionRef } from '@/lib/convexFunctionRef';
+import { useConvexUserQueryReady } from '@/lib/useConvexUserQueryReady';
 
 // Import Convex API
 let api: any;
 let isConvexAvailable = false;
 
-// Helper to detect if we're using stub functions
-function isStubFunction(fn: any): boolean {
-  if (!fn || typeof fn !== 'function') return true;
-  // Stub functions are empty arrow functions with no properties
-  // Check if the function stringifies to '() => {}' or similar
-  const fnStr = fn.toString().trim();
-  // Match various forms of empty functions: '() => {}', 'function(){}', etc.
-  const isEmptyFunction = /^\s*\(\)\s*=>\s*\{\}\s*$/.test(fnStr) || 
-                          /^\s*function\s*\(\s*\)\s*\{\}\s*$/.test(fnStr) ||
-                          fnStr === '() => {}' ||
-                          fnStr === 'function () {}';
-  return isEmptyFunction;
-}
-
 try {
   api = require('@/convex/_generated/api').api;
-  // Check if we're using stub functions or if Convex URL is configured
-  // If any function is a stub, Convex isn't properly set up
-  const hasStubs = isStubFunction(api?.songs?.getHistory) || 
-                   isStubFunction(api?.songs?.addHistory);
-  // Also check if Convex URL is configured (available at build time)
+  const historyReady =
+    isConvexFunctionRef(api?.songs?.getHistory) && isConvexFunctionRef(api?.songs?.addHistory);
   const hasConvexUrl = typeof process !== 'undefined' && !!process.env.NEXT_PUBLIC_CONVEX_URL;
-  isConvexAvailable = !hasStubs && hasConvexUrl;
+  isConvexAvailable = historyReady && hasConvexUrl;
 } catch {
   // Using stub API - Convex is not available
   api = {
@@ -47,12 +32,12 @@ try {
 
 export function useHistory() {
   const { isSignedIn } = useUser();
+  const convexUserReady = useConvexUserQueryReady();
   const { history, setHistory } = usePlayerStore();
 
   // Check if we have a valid Convex function (not a stub)
   const hasValidFunction = useMemo(() => {
-    const fn = api?.songs?.getHistory;
-    return fn && !isStubFunction(fn) && isConvexAvailable;
+    return isConvexAvailable && isConvexFunctionRef(api?.songs?.getHistory);
   }, []);
   
   // Get the function reference - provide a safe fallback to satisfy Rules of Hooks
@@ -60,7 +45,7 @@ export function useHistory() {
     return api?.songs?.getHistory || (() => []);
   }, []);
   
-  const shouldSkip = !hasValidFunction || !isSignedIn;
+  const shouldSkip = !hasValidFunction || !convexUserReady;
   
   // Always call useQuery to satisfy Rules of Hooks; use skip option to avoid fetching when not ready
   const convexHistory = useQuery(getHistoryFn, shouldSkip ? 'skip' : { limit: 100 });
@@ -87,11 +72,11 @@ export function useHistory() {
 
 export function useAddToHistory() {
   const { isSignedIn } = useUser();
+  const convexUserReady = useConvexUserQueryReady();
 
   // Check if we have a valid Convex function (not a stub)
   const isValidFn = useMemo(() => {
-    const fn = api?.songs?.addHistory;
-    return fn && !isStubFunction(fn) && isConvexAvailable;
+    return isConvexAvailable && isConvexFunctionRef(api?.songs?.addHistory);
   }, []);
   
   // Get the function reference - provide safe fallback to satisfy Rules of Hooks
@@ -104,7 +89,7 @@ export function useAddToHistory() {
 
   // Memoize the function to prevent infinite loops
   const addToHistory = useCallback(async (song: Song) => {
-    if (!isSignedIn || !addHistoryMutation || !isValidFn) return;
+    if (!isSignedIn || !convexUserReady || !addHistoryMutation || !isValidFn) return;
 
     try {
       await addHistoryMutation({
@@ -117,7 +102,7 @@ export function useAddToHistory() {
     } catch (error) {
       console.error('Failed to save to history:', error);
     }
-  }, [isSignedIn, addHistoryMutation, isValidFn]);
+  }, [isSignedIn, convexUserReady, addHistoryMutation, isValidFn]);
 
   return { addToHistory, isSignedIn };
 }

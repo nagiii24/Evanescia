@@ -186,8 +186,15 @@ export async function getRelatedVideos(videoId: string): Promise<Song[]> {
     return songs;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      console.error('YouTube API Error (getRelatedVideos):', error.response?.data || error.message);
-      throw new Error(`Failed to get related videos: ${error.response?.data?.error?.message || error.message}`);
+      console.warn('YouTube API Error (getRelatedVideos):', error.response?.data || error.message);
+      // Some videos (or relatedToVideoId queries) can produce a 400 'Request contains an invalid argument.'
+      // Treat these as no related videos instead of throwing an error that bubbles to the UI.
+      const status = error.response?.status;
+      const message = error.response?.data?.error?.message || error.message;
+      if (status === 400 || (typeof message === 'string' && message.includes('invalid argument'))) {
+        return [] as Song[];
+      }
+      throw new Error(`Failed to get related videos: ${message}`);
     }
     throw error;
   }

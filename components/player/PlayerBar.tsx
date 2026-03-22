@@ -6,6 +6,7 @@ import ReactPlayer from 'react-player';
 import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Plus } from 'lucide-react';
 import AudioVisualizer from './AudioVisualizer';
 import { usePlaylists } from '@/components/hooks/usePlaylists';
+import { useUser } from '@clerk/nextjs';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds) || !isFinite(seconds)) return '0:00';
@@ -35,10 +36,12 @@ export default function PlayerBar() {
     setCurrentTime,
   } = usePlayerStore();
 
-  // Construct YouTube URL from video ID
-  const youtubeUrl = currentSong
-    ? `https://www.youtube.com/watch?v=${currentSong.id}`
-    : null;
+  // Construct YouTube URL from video ID (only if id looks valid)
+  const isValidYoutubeId = currentSong && typeof currentSong.id === 'string' && /^[A-Za-z0-9_-]{6,}$/.test(currentSong.id);
+  if (currentSong && !isValidYoutubeId) {
+    console.warn('Current song has an invalid YouTube id:', currentSong);
+  }
+  const youtubeUrl = isValidYoutubeId ? `https://www.youtube.com/watch?v=${currentSong!.id}` : null;
 
   // Force play when isPlaying changes and user has interacted
   useEffect(() => {
@@ -176,65 +179,67 @@ export default function PlayerBar() {
 
   return (
     <div className="fixed bottom-0 w-full bg-miko-white/30 backdrop-blur-md border-t border-sakura-primary/30 shadow-[0_0_20px_rgba(255,183,197,0.2)] z-50">
-      {/* ReactPlayer for audio playback - Mobile compatible */}
-      <div 
-        style={{ 
-          position: 'fixed',
-          top: '0',
-          left: '0',
-          width: '1px',
-          height: '1px',
-          opacity: 0,
-          pointerEvents: 'none',
-          zIndex: -1,
-        }}
-      >
-        <ReactPlayer
-          ref={playerRef}
-          url={youtubeUrl || ''}
-          playing={isPlaying}
-          volume={volume}
-          width="100%"
-          height="100%"
-          config={{
-            youtube: {
-              playerVars: {
-                autoplay: 0, // Disable autoplay to allow manual control on mobile
-                controls: 0,
-                disablekb: 1,
-                fs: 0,
-                iv_load_policy: 3,
-                modestbranding: 1,
-                playsinline: 1, // Critical for iOS
-                rel: 0,
-                showinfo: 0,
-                enablejsapi: 1,
-                mute: 0,
-                origin: typeof window !== 'undefined' ? window.location.origin : '',
+      {/* ReactPlayer for audio playback - only render when we have a valid YouTube URL */}
+      {youtubeUrl ? (
+        <div 
+          style={{ 
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            width: '1px',
+            height: '1px',
+            opacity: 0,
+            pointerEvents: 'none',
+            zIndex: -1,
+          }}
+        >
+          <ReactPlayer
+            ref={playerRef}
+            url={youtubeUrl}
+            playing={isPlaying}
+            volume={volume}
+            width="100%"
+            height="100%"
+            config={{
+              youtube: {
+                playerVars: {
+                  autoplay: 0, // Disable autoplay to allow manual control on mobile
+                  controls: 0,
+                  disablekb: 1,
+                  fs: 0,
+                  iv_load_policy: 3,
+                  modestbranding: 1,
+                  playsinline: 1, // Critical for iOS
+                  rel: 0,
+                  showinfo: 0,
+                  enablejsapi: 1,
+                  mute: 0,
+                  origin: typeof window !== 'undefined' ? window.location.origin : '',
+                },
               },
-            },
-          }}
-          playsinline={true}
-          onEnded={handleEnded}
-          onProgress={handleProgress}
-          onDuration={handleDuration}
-          onError={(error) => {
-            console.error('Player error:', error);
-          }}
-          onReady={() => {
-            console.log('Player ready');
-            // If already playing when ready, try to play
-            if (isPlaying && hasUserInteracted) {
-              setTimeout(() => {
-                const internalPlayer = playerRef.current?.getInternalPlayer();
-                if (internalPlayer && typeof (internalPlayer as any).playVideo === 'function') {
-                  (internalPlayer as any).playVideo();
-                }
-              }, 100);
-            }
-          }}
-        />
-      </div>
+            }}
+            playsinline={true}
+            onEnded={handleEnded}
+            onProgress={handleProgress}
+            onDuration={handleDuration}
+            onError={(error) => {
+              console.error('Player error:', error);
+            }}
+            onReady={() => {
+              console.log('Player ready');
+              // If already playing when ready, try to play
+              if (isPlaying && hasUserInteracted) {
+                setTimeout(() => {
+                  const internalPlayer = playerRef.current?.getInternalPlayer();
+                  if (internalPlayer && typeof (internalPlayer as any).playVideo === 'function') {
+                    (internalPlayer as any).playVideo();
+                  }
+                }, 100);
+              }
+            }}
+          />
+        </div>
+      ) : null}
 
       {/* Audio Visualizer */}
       <AudioVisualizer />
@@ -348,11 +353,14 @@ export default function PlayerBar() {
 }
 
 function AddToPlaylistButton({ currentSong }: { currentSong: any }) {
-  const { playlists, createPlaylist, addSongToPlaylist, enabled } = usePlaylists();
+  const { playlists, createPlaylist, addSongToPlaylist, enabled, playlistBackendHelp } =
+    usePlaylists();
+  const { isSignedIn } = useUser();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const toggle = () => setOpen((s) => !s);
 
   if (!currentSong) return null;
@@ -362,6 +370,7 @@ function AddToPlaylistButton({ currentSong }: { currentSong: any }) {
     if (!newName.trim()) return;
     setCreating(true);
     try {
+      setError(null);
       const res = await createPlaylist(newName.trim(), '');
       // After creating, try to add the song to the new playlist
       if (addSongToPlaylist && res) {
@@ -371,8 +380,9 @@ function AddToPlaylistButton({ currentSong }: { currentSong: any }) {
       }
       setNewName('');
       setOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Create playlist failed', err);
+      setError(err?.message || String(err));
     } finally {
       setCreating(false);
     }
@@ -381,12 +391,14 @@ function AddToPlaylistButton({ currentSong }: { currentSong: any }) {
   const onAdd = async (playlistId: any) => {
     if (!addSongToPlaylist) return;
     try {
+      setError(null);
       setLoadingId(String(playlistId));
       await addSongToPlaylist(playlistId, currentSong);
       setLoadingId(null);
       setOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Add song failed', err);
+      setError(err?.message || String(err));
       setLoadingId(null);
     }
   };
@@ -433,6 +445,42 @@ function AddToPlaylistButton({ currentSong }: { currentSong: any }) {
               placeholder="New playlist"
               className="w-full px-2 py-1 text-sm border rounded bg-white/90"
             />
+            {/* Informational hint when create is not available */}
+            {!isSignedIn ? (
+              <div className="text-xs text-gray-600 mt-1">Sign in to create playlists.</div>
+            ) : playlistBackendHelp.kind === 'missing_convex_url' ? (
+              <div className="text-xs text-gray-600 mt-1">
+                Set <code className="text-gray-500">NEXT_PUBLIC_CONVEX_URL</code> in{' '}
+                <code className="text-gray-500">.env.local</code> (local) or Vercel env, then
+                redeploy.
+              </div>
+            ) : playlistBackendHelp.kind === 'clerk_loading' ||
+              playlistBackendHelp.kind === 'convex_connecting' ? (
+              <div className="text-xs text-gray-600 mt-1">Connecting to your library…</div>
+            ) : playlistBackendHelp.kind === 'convex_auth_setup' ? (
+              <div className="text-xs text-gray-600 mt-1 leading-snug">
+                Convex isn&apos;t receiving your sign-in. In Clerk, add a JWT template named{' '}
+                <code className="text-gray-500">convex</code>, and set Convex dashboard env vars
+                for <code className="text-gray-500">CLERK_JWT_ISSUER_DOMAIN</code> and{' '}
+                <code className="text-gray-500">CLERK_APPLICATION_ID</code>. See{' '}
+                <a
+                  href="https://docs.convex.dev/auth/clerk"
+                  className="text-cyan-600 underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Convex + Clerk
+                </a>
+                .
+              </div>
+            ) : !createPlaylist ? (
+              <div className="text-xs text-gray-600 mt-1">Playlists are unavailable right now.</div>
+            ) : null}
+
+            {error && (
+              <div className="text-xs text-red-600 mt-1">{error}</div>
+            )}
+
             <div className="flex gap-2 mt-2">
               <button
                 onClick={onCreate}
