@@ -1,14 +1,16 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-// Get user ID from Clerk
-export async function getUserId(ctx: any) {
+/**
+ * Resolve Convex user id from a single identity read (find or create users row).
+ * Returns null if unauthenticated or missing subject — use for read queries that should not throw.
+ */
+export async function getUserIdOrNull(ctx: any): Promise<any | null> {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new Error("Not authenticated");
+  if (!identity?.subject) {
+    return null;
   }
 
-  // Find user by clerkId (subject from Clerk JWT)
   const existingUser = await ctx.db
     .query("users")
     .withIndex("by_clerkId", (q: any) => q.eq("clerkId", identity.subject))
@@ -18,12 +20,20 @@ export async function getUserId(ctx: any) {
     return existingUser._id;
   }
 
-  // Create new user
   return await ctx.db.insert("users", {
     clerkId: identity.subject,
     name: identity.name || "User",
     email: identity.email || "",
   });
+}
+
+/** Mutations: require a logged-in user with a valid subject. */
+export async function getUserId(ctx: any) {
+  const id = await getUserIdOrNull(ctx);
+  if (!id) {
+    throw new Error("Not authenticated");
+  }
+  return id;
 }
 
 // Add a liked song
@@ -86,12 +96,11 @@ export const removeLike = mutation({
 // Get all liked songs for current user
 export const getLikes = query({
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const userId = await getUserIdOrNull(ctx);
+    if (!userId) {
       return [];
     }
 
-    const userId = await getUserId(ctx);
     const likedSongs = await ctx.db
       .query("likedSongs")
       .withIndex("by_userId", (q: any) => q.eq("userId", userId))
@@ -113,12 +122,11 @@ export const isLiked = query({
     songId: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const userId = await getUserIdOrNull(ctx);
+    if (!userId) {
       return false;
     }
 
-    const userId = await getUserId(ctx);
     const liked = await ctx.db
       .query("likedSongs")
       .withIndex("by_userId_songId", (q: any) =>
@@ -175,12 +183,11 @@ export const getHistory = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const userId = await getUserIdOrNull(ctx);
+    if (!userId) {
       return [];
     }
 
-    const userId = await getUserId(ctx);
     const limit = args.limit || 100; // Default to 100 most recent
 
     const history = await ctx.db
