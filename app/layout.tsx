@@ -33,11 +33,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const clerkPk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
   return (
-    <ClerkProvider>
-      <ConvexClientProvider>
-        <html lang="en" className={playfair.variable}>
-          <body className={playfair.variable}>
+    <html lang="en" className={playfair.variable}>
+      <body className={playfair.variable}>
+        <ClerkProvider publishableKey={clerkPk}>
+          <ConvexClientProvider>
             <LofiBackground />
             <SakuraDrop />
             <NavBar />
@@ -48,10 +50,10 @@ export default function RootLayout({
               <PlayerBar />
             </ErrorBoundary>
             <ErrorLogger />
-          </body>
-        </html>
-      </ConvexClientProvider>
-    </ClerkProvider>
+          </ConvexClientProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }
 
