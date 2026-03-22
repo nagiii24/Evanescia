@@ -458,21 +458,35 @@ function AddToPlaylistButton({ currentSong }: { currentSong: any }) {
               playlistBackendHelp.kind === 'convex_connecting' ? (
               <div className="text-xs text-gray-600 mt-1">Connecting to your library…</div>
             ) : playlistBackendHelp.kind === 'convex_auth_setup' ? (
-              <div className="text-xs text-gray-600 mt-1 leading-snug">
-                Convex isn&apos;t receiving your sign-in. In Clerk, add a JWT template named{' '}
-                <code className="text-gray-500">convex</code>. In the Convex dashboard, set{' '}
-                <code className="text-gray-500">CLERK_JWT_ISSUER_DOMAIN</code> to your Clerk Frontend
-                API URL (same host as <code className="text-gray-500">*.clerk.accounts.dev</code>).
-                Then run <code className="text-gray-500">npx convex deploy</code>. See{' '}
-                <a
-                  href="https://docs.convex.dev/auth/clerk"
-                  className="text-cyan-600 underline"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Convex + Clerk
-                </a>
-                .
+              <div className="text-xs text-gray-600 mt-1 leading-snug space-y-1">
+                <p>
+                  Convex rejected the Clerk token. Most often the JWT <code className="text-gray-500">aud</code>{' '}
+                  claim is wrong.
+                </p>
+                <p>
+                  In Clerk, open{' '}
+                  <a
+                    href="https://dashboard.clerk.com/apps/setup/convex"
+                    className="text-cyan-600 underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Activate Convex integration
+                  </a>{' '}
+                  (sets <code className="text-gray-500">aud</code> for Convex). Or edit your{' '}
+                  <code className="text-gray-500">convex</code> JWT template and add claims:{' '}
+                  <code className="text-gray-500">{`{"aud":"convex"}`}</code>.
+                </p>
+                <p>
+                  Convex env: <code className="text-gray-500">CLERK_JWT_ISSUER_DOMAIN</code> = template
+                  Issuer. If <code className="text-gray-500">aud</code> on{' '}
+                  <a href="https://jwt.io" className="text-cyan-600 underline" target="_blank" rel="noreferrer">
+                    jwt.io
+                  </a>{' '}
+                  is not <code className="text-gray-500">convex</code>, set Convex env{' '}
+                  <code className="text-gray-500">CLERK_JWT_AUDIENCE</code> to that exact value, then{' '}
+                  <code className="text-gray-500">npx convex deploy</code>.
+                </p>
               </div>
             ) : !createPlaylist ? (
               <div className="text-xs text-gray-600 mt-1">Playlists are unavailable right now.</div>
