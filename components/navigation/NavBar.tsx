@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Search, Compass, Heart, History, ListMusic, Mic2, Settings, Menu, X } from 'lucide-react';
+import EmptyRoomsNav from '@/components/navigation/EmptyRoomsNav';
 
 interface NavItem {
   href: string;
@@ -140,6 +141,7 @@ export default function NavBar() {
             <div className="flex flex-col gap-1">
               {libraryItems.map((item, index) => renderNavItem(item, index + mainItems.length))}
             </div>
+            <EmptyRoomsNav />
             {/* Yae Sakura Image under Saved Artists - Hidden on mobile */}
             <div className="mt-3 px-4 hidden md:block">
               <div className="bg-miko-white/20 backdrop-blur-sm border border-sakura-primary/20 rounded-lg overflow-hidden">

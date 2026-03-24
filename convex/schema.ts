@@ -52,4 +52,21 @@ export default defineSchema({
   })
     .index("by_playlistId", ["playlistId"])
     .index("by_playlist_song", ["playlistId", "songId"]),
+
+  listeningRooms: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    createdByUserId: v.id("users"),
+    createdAt: v.number(),
+    occupantCount: v.number(),
+  }).index("by_slug", ["slug"]),
+
+  listeningRoomMembers: defineTable({
+    roomId: v.id("listeningRooms"),
+    userId: v.id("users"),
+    joinedAt: v.number(),
+  })
+    .index("by_roomId", ["roomId"])
+    .index("by_userId", ["userId"])
+    .index("by_room_user", ["roomId", "userId"]),
 });

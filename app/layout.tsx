@@ -38,7 +38,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={playfair.variable}>
       <body className={playfair.variable}>
-        <ClerkProvider publishableKey={clerkPk}>
+        <ClerkProvider
+          publishableKey={clerkPk}
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+          signInFallbackRedirectUrl="/"
+          signUpFallbackRedirectUrl="/"
+        >
           <ConvexClientProvider>
             <LofiBackground />
             <SakuraDrop />

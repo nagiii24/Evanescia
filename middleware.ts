@@ -6,6 +6,8 @@ const isPublicRoute = createRouteMatcher([
   '/explore',
   '/sign-in(.*)',
   '/sign-up(.*)',
+  // Browsable without auth; pages show sign-in prompts for actions that need Convex
+  '/rooms(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
