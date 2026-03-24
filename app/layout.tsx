@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import dynamic from "next/dynamic";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ConvexClientProvider } from "@/lib/convex-provider";
-import PlayerBar from "@/components/player/PlayerBar";
 import LofiBackground from "@/components/ui/LofiBackground";
 import NavBar from "@/components/navigation/NavBar";
 import HeaderAuth from "@/components/layout/HeaderAuth";
@@ -19,6 +19,9 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
+/** Avoid SSR for the YouTube player stack (react-player); prevents prod/hydration edge cases on Vercel. */
+const PlayerBar = dynamic(() => import("@/components/player/PlayerBar"), { ssr: false });
+
 export const metadata: Metadata = {
   title: "Evanescia",
   description: "Music app built with Next.js",
@@ -33,7 +36,21 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const clerkPk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const clerkPk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
+
+  if (!clerkPk) {
+    return (
+      <html lang="en">
+        <body style={{ fontFamily: "system-ui", padding: 24, maxWidth: 560 }}>
+          <h1 style={{ fontSize: 20, marginBottom: 12 }}>Missing environment variable</h1>
+          <p style={{ marginBottom: 12, lineHeight: 1.5 }}>
+            Set <code>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code> in your Vercel project (Settings → Environment Variables),
+            then redeploy. Add <code>NEXT_PUBLIC_CONVEX_URL</code> as well if you use Convex.
+          </p>
+        </body>
+      </html>
+    );
+  }
 
   return (
     <html lang="en" className={playfair.variable}>

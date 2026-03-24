@@ -8,6 +8,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { searchYoutube } from '@/lib/youtube';
 import { usePlayerStore } from '@/lib/store';
+import { computeRoomPlaybackPosition } from '@/lib/roomPlayback';
 import type { Song } from '@/types';
 import { usePlaylists, usePlaylistSongs } from '@/components/hooks/usePlaylists';
 import { useConvexUserLinkState } from '@/lib/useConvexUserQueryReady';
@@ -36,7 +37,7 @@ export default function RoomPage() {
   const leaveRoom = useMutation(api.listeningRooms.leaveRoom);
 
   const { playlists } = usePlaylists();
-  const { playPlaylistFrom, playPlaylistShuffled, setSong } = usePlayerStore();
+  const { playPlaylistFrom, playPlaylistShuffled, setSong, syncPlaybackFromRoom } = usePlayerStore();
 
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const { songs, isLoading: songsLoading } = usePlaylistSongs(selectedPlaylistId);
@@ -82,6 +83,28 @@ export default function RoomPage() {
       }
     })();
   }, [slug, link.ready, roomStatus, joinRoom]);
+
+  // Match the room’s shared playback (same track + position as whoever is driving the player).
+  useEffect(() => {
+    if (roomStatus !== 'ok' || !room?.playback || room.serverNowMs === undefined) return;
+    const pb = room.playback;
+    if (!pb?.song?.id) return;
+    const remotePos = computeRoomPlaybackPosition(
+      {
+        anchorMs: pb.anchorMs,
+        positionSec: pb.positionSec,
+        isPlaying: pb.isPlaying,
+        song: pb.song,
+      },
+      room.serverNowMs,
+    );
+    const { currentSong, currentTime, isPlaying } = usePlayerStore.getState();
+    const sameSong = currentSong?.id === pb.song.id;
+    if (sameSong && isPlaying === pb.isPlaying && Math.abs(currentTime - remotePos) < 3) {
+      return;
+    }
+    syncPlaybackFromRoom(pb.song, remotePos, pb.isPlaying);
+  }, [room, roomStatus, syncPlaybackFromRoom]);
 
   const handleLeave = async () => {
     await doLeave();
@@ -172,7 +195,8 @@ export default function RoomPage() {
               <span className="min-w-0 break-words">{room.name}</span>
             </h1>
             <p className="text-gray-400 text-sm mt-1">
-              {room.memberCount} in this room · Your playback is private—use your library or search below.
+              {room.memberCount} in this room · Playback is shared: everyone hears the same track and position while
+              someone is playing from this room page.
             </p>
           </div>
           <button

@@ -1,12 +1,17 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
+import { useMutation } from 'convex/react';
 import { usePlayerStore } from '@/lib/store';
+import { api } from '@/convex/_generated/api';
+import { parseRoomSlugFromPathname } from '@/lib/roomPlayback';
 import ReactPlayer from 'react-player';
 import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Plus } from 'lucide-react';
 import AudioVisualizer from './AudioVisualizer';
 import { usePlaylists } from '@/components/hooks/usePlaylists';
 import { useUser } from '@clerk/nextjs';
+import type { Song } from '@/types';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds) || !isFinite(seconds)) return '0:00';
@@ -34,14 +39,84 @@ export default function PlayerBar() {
     currentTime,
     setDuration,
     setCurrentTime,
+    oneShotSeekSeconds,
   } = usePlayerStore();
 
-  // Construct YouTube URL from video ID (only if id looks valid)
-  const isValidYoutubeId = currentSong && typeof currentSong.id === 'string' && /^[A-Za-z0-9_-]{6,}$/.test(currentSong.id);
-  if (currentSong && !isValidYoutubeId) {
-    console.warn('Current song has an invalid YouTube id:', currentSong);
-  }
-  const youtubeUrl = isValidYoutubeId ? `https://www.youtube.com/watch?v=${currentSong!.id}` : null;
+  const isValidYoutubeId =
+    Boolean(currentSong) &&
+    typeof currentSong!.id === 'string' &&
+    /^[A-Za-z0-9_-]{6,}$/.test(currentSong!.id);
+  const youtubeUrl =
+    isValidYoutubeId && currentSong
+      ? `https://www.youtube.com/watch?v=${currentSong.id}`
+      : null;
+
+  const pathname = usePathname();
+  const roomSlug = parseRoomSlugFromPathname(pathname);
+  const syncRoomPlayback = useMutation(api.listeningRooms.syncRoomPlayback);
+
+  const pushRoomPlayback = useCallback(
+    async (song: Song, positionSec: number, playing: boolean) => {
+      if (!roomSlug) return;
+      try {
+        await syncRoomPlayback({
+          slug: roomSlug,
+          song: {
+            id: song.id,
+            title: song.title,
+            artist: song.artist,
+            thumbnailUrl: song.thumbnailUrl,
+            duration: song.duration,
+          },
+          positionSec,
+          isPlaying: playing,
+        });
+      } catch {
+        /* not a member or offline */
+      }
+    },
+    [roomSlug, syncRoomPlayback],
+  );
+
+  // Publish on track / play-state change (not on every progress tick).
+  useEffect(() => {
+    if (!roomSlug || !currentSong) return;
+    const { currentSong: s, currentTime: t, isPlaying: p } = usePlayerStore.getState();
+    if (!s) return;
+    void pushRoomPlayback(s, t, p);
+  }, [roomSlug, currentSong?.id, isPlaying, pushRoomPlayback, currentSong]);
+
+  useEffect(() => {
+    if (!roomSlug || !currentSong || !isPlaying) return;
+    const id = window.setInterval(() => {
+      const { currentSong: s, currentTime: t, isPlaying: p } = usePlayerStore.getState();
+      if (s && p) void pushRoomPlayback(s, t, true);
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [roomSlug, currentSong?.id, currentSong, isPlaying, pushRoomPlayback]);
+
+  // Room-synced seek: YouTube needs a moment after load.
+  useEffect(() => {
+    if (oneShotSeekSeconds == null || !youtubeUrl) return;
+    const t = oneShotSeekSeconds;
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      if (playerRef.current) {
+        playerRef.current.seekTo(t, 'seconds');
+        setCurrentTime(t);
+        usePlayerStore.setState({ oneShotSeekSeconds: null });
+      }
+    };
+    run();
+    const id = window.setTimeout(run, 320);
+    const id2 = window.setTimeout(run, 900);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+      window.clearTimeout(id2);
+    };
+  }, [oneShotSeekSeconds, youtubeUrl, setCurrentTime, currentSong?.id]);
 
   // Force play when isPlaying changes and user has interacted
   useEffect(() => {
@@ -101,6 +176,10 @@ export default function PlayerBar() {
       playerRef.current.seekTo(newTime, 'seconds');
     }
     setIsSeeking(false);
+    if (roomSlug) {
+      const { currentSong: s, isPlaying: p } = usePlayerStore.getState();
+      if (s) void pushRoomPlayback(s, newTime, p);
+    }
   };
 
   const handleSeekMouseDown = () => {
@@ -175,6 +254,10 @@ export default function PlayerBar() {
   // This must come AFTER all hooks to satisfy Rules of Hooks
   if (!currentSong) {
     return null;
+  }
+
+  if (!isValidYoutubeId) {
+    console.warn('Current song has an invalid YouTube id:', currentSong);
   }
 
   return (

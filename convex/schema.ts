@@ -59,6 +59,16 @@ export default defineSchema({
     createdByUserId: v.id("users"),
     createdAt: v.number(),
     occupantCount: v.number(),
+    /** Shared playback: wall-clock anchor so joiners can compute the same position. */
+    playbackSongId: v.optional(v.string()),
+    playbackTitle: v.optional(v.string()),
+    playbackArtist: v.optional(v.string()),
+    playbackThumbnailUrl: v.optional(v.string()),
+    playbackDuration: v.optional(v.number()),
+    playbackAnchorMs: v.optional(v.number()),
+    playbackPositionSec: v.optional(v.number()),
+    playbackIsPlaying: v.optional(v.boolean()),
+    playbackUpdatedAt: v.optional(v.number()),
   }).index("by_slug", ["slug"]),
 
   listeningRoomMembers: defineTable({

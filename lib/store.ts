@@ -30,6 +30,9 @@ interface PlayerStore extends PlayerState {
   setMinimized: (isMinimized: boolean) => void;
   setDuration: (duration: number) => void;
   setCurrentTime: (currentTime: number) => void;
+  /** Apply Convex room sync without touching history; triggers a one-shot seek in PlayerBar. */
+  syncPlaybackFromRoom: (song: Song, positionSec: number, isPlaying: boolean) => void;
+  oneShotSeekSeconds: number | null;
   // Liked songs
   likedSongs: Song[];
   setLikedSongs: (songs: Song[]) => void;
@@ -51,6 +54,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   isMinimized: false,
   duration: 0,
   currentTime: 0,
+  oneShotSeekSeconds: null,
   history: [],
   likedSongs: [],
   onHistoryAdd: undefined,
@@ -330,5 +334,17 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
   setCurrentTime: (currentTime: number) => {
     set({ currentTime });
+  },
+
+  syncPlaybackFromRoom: (song: Song, positionSec: number, isPlaying: boolean) => {
+    if (!isValidSongId(song)) return;
+    set({
+      currentSong: song,
+      currentTime: positionSec,
+      isPlaying,
+      playlistOnly: false,
+      queue: [],
+      oneShotSeekSeconds: positionSec,
+    });
   },
 }));

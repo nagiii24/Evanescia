@@ -116,6 +116,27 @@ export const getRoomWithMembersBySlug = query({
       });
     }
 
+    const serverNowMs = Date.now();
+    const playbackSongId = room.playbackSongId;
+    const playback =
+      playbackSongId &&
+      room.playbackAnchorMs !== undefined &&
+      room.playbackPositionSec !== undefined
+        ? {
+            song: {
+              id: playbackSongId,
+              title: room.playbackTitle ?? "",
+              artist: room.playbackArtist ?? "",
+              thumbnailUrl: room.playbackThumbnailUrl ?? "",
+              duration: room.playbackDuration ?? 0,
+            },
+            anchorMs: room.playbackAnchorMs,
+            positionSec: room.playbackPositionSec,
+            isPlaying: room.playbackIsPlaying ?? false,
+            updatedAt: room.playbackUpdatedAt ?? 0,
+          }
+        : null;
+
     return {
       _id: room._id,
       name: room.name,
@@ -125,7 +146,76 @@ export const getRoomWithMembersBySlug = query({
       /** Mirrors table rows; prefer this for display if it ever disagrees with occupantCount. */
       memberCount: members.length,
       members,
+      playback,
+      serverNowMs,
     };
+  },
+});
+
+const roomSongValidator = v.object({
+  id: v.string(),
+  title: v.string(),
+  artist: v.string(),
+  thumbnailUrl: v.string(),
+  duration: v.number(),
+});
+
+export const syncRoomPlayback = mutation({
+  args: {
+    slug: v.string(),
+    positionSec: v.number(),
+    isPlaying: v.boolean(),
+    song: v.optional(roomSongValidator),
+    clear: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getUserId(ctx);
+    const room = await ctx.db
+      .query("listeningRooms")
+      .withIndex("by_slug", (q: any) => q.eq("slug", args.slug))
+      .first();
+    if (!room) throw new Error("Room not found");
+
+    const membership = await ctx.db
+      .query("listeningRoomMembers")
+      .withIndex("by_room_user", (q: any) =>
+        q.eq("roomId", room._id).eq("userId", userId),
+      )
+      .first();
+    if (!membership) throw new Error("Not a member of this room");
+
+    const now = Date.now();
+
+    if (args.clear) {
+      await ctx.db.patch(room._id, {
+        playbackSongId: undefined,
+        playbackTitle: undefined,
+        playbackArtist: undefined,
+        playbackThumbnailUrl: undefined,
+        playbackDuration: undefined,
+        playbackAnchorMs: undefined,
+        playbackPositionSec: undefined,
+        playbackIsPlaying: undefined,
+        playbackUpdatedAt: undefined,
+      });
+      return;
+    }
+
+    if (!args.song) {
+      throw new Error("song is required unless clear is true");
+    }
+
+    await ctx.db.patch(room._id, {
+      playbackSongId: args.song.id,
+      playbackTitle: args.song.title,
+      playbackArtist: args.song.artist,
+      playbackThumbnailUrl: args.song.thumbnailUrl,
+      playbackDuration: args.song.duration,
+      playbackAnchorMs: now,
+      playbackPositionSec: args.positionSec,
+      playbackIsPlaying: args.isPlaying,
+      playbackUpdatedAt: now,
+    });
   },
 });
 
