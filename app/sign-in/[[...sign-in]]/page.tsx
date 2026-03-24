@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { SignIn } from '@clerk/nextjs';
-import InAppBrowserAuthHint from '@/components/auth/InAppBrowserAuthHint';
 
 /** Avoid stale static shell; auth pages must be dynamic. */
 export const dynamic = 'force-dynamic';
@@ -15,7 +14,6 @@ export default function SignInPage() {
         >
           ← Back to Evanescia
         </Link>
-        <InAppBrowserAuthHint />
         <SignIn
           routing="path"
           path="/sign-in"
