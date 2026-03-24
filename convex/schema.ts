@@ -76,6 +76,8 @@ export default defineSchema({
     roomId: v.id("listeningRooms"),
     userId: v.id("users"),
     joinedAt: v.number(),
+    /** Refreshed while the member keeps the room open; stale rows are ignored for listener counts. */
+    lastSeenAt: v.optional(v.number()),
   })
     .index("by_roomId", ["roomId"])
     .index("by_userId", ["userId"])

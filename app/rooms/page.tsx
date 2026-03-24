@@ -178,9 +178,10 @@ export default function RoomsPage() {
         ) : (
           <>
             <p className="text-gray-500 text-xs mb-5 max-w-prose leading-relaxed">
-              <strong className="text-gray-400">Empty</strong> means no one is in that room right now.
-              You stay in a room while you browse the site; use <strong className="text-gray-400">Leave room</strong> on
-              the room page when you are done, or open a different room to switch.
+              <strong className="text-gray-400">Empty</strong> means no real members right now (counts come from who is
+              actually in the room). Leaving the room page, closing the tab, or opening another room removes you from the
+              list. You can still tap <strong className="text-gray-400">Leave room</strong> before leaving if you want to
+              clear shared playback for everyone.
             </p>
             <section className="mb-8">
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">

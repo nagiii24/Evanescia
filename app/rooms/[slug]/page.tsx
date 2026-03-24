@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
@@ -35,9 +35,12 @@ export default function RoomPage() {
 
   const joinRoom = useMutation(api.listeningRooms.joinRoom);
   const leaveRoom = useMutation(api.listeningRooms.leaveRoom);
+  const syncRoomPlayback = useMutation(api.listeningRooms.syncRoomPlayback);
+  const pingListeningRoom = useMutation(api.listeningRooms.pingListeningRoom);
 
   const { playlists } = usePlaylists();
-  const { playPlaylistFrom, playPlaylistShuffled, setSong, syncPlaybackFromRoom } = usePlayerStore();
+  const { playPlaylistFrom, playPlaylistShuffled, setSong, syncPlaybackFromRoom, clearPlayer } =
+    usePlayerStore();
 
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const { songs, isLoading: songsLoading } = usePlaylistSongs(selectedPlaylistId);
@@ -70,8 +73,7 @@ export default function RoomPage() {
     }
   }, [slug, leaveRoom]);
 
-  // Join when opening the room; do not leave on navigation away — otherwise /rooms shows the room as empty.
-  // Leaving is explicit (Leave room) or implicit when joining another room (see joinRoom → leaveAllRoomsForUser).
+  // Join when the room exists; leave when you close the page or navigate away (avoids “ghost” listeners).
   useEffect(() => {
     if (!slug || !link.ready || roomStatus !== 'ok') return;
 
@@ -82,7 +84,30 @@ export default function RoomPage() {
         /* ignore; user may retry via refresh */
       }
     })();
-  }, [slug, link.ready, roomStatus, joinRoom]);
+
+    return () => {
+      void leaveRoom({ slug }).catch(() => {});
+    };
+  }, [slug, link.ready, roomStatus, joinRoom, leaveRoom]);
+
+  // Heartbeat so “ghost” membership from crashes doesn’t keep you “in the room” forever for listener counts.
+  useEffect(() => {
+    if (!slug || !link.ready || roomStatus !== 'ok') return;
+    const ping = () => void pingListeningRoom({ slug }).catch(() => {});
+    ping();
+    const id = window.setInterval(ping, 25_000);
+    return () => window.clearInterval(id);
+  }, [slug, link.ready, roomStatus, pingListeningRoom]);
+
+  const hadRoomPlaybackRef = useRef(false);
+  useEffect(() => {
+    if (roomStatus !== 'ok' || !slug) return;
+    const hasPlayback = Boolean(room?.playback?.song?.id);
+    if (hadRoomPlaybackRef.current && !hasPlayback) {
+      clearPlayer();
+    }
+    hadRoomPlaybackRef.current = hasPlayback;
+  }, [room, roomStatus, slug, clearPlayer]);
 
   // Match the room’s shared playback (same track + position as whoever is driving the player).
   useEffect(() => {
@@ -107,6 +132,18 @@ export default function RoomPage() {
   }, [room, roomStatus, syncPlaybackFromRoom]);
 
   const handleLeave = async () => {
+    if (!slug) return;
+    clearPlayer();
+    try {
+      await syncRoomPlayback({
+        slug,
+        positionSec: 0,
+        isPlaying: false,
+        clear: true,
+      });
+    } catch {
+      /* still leave membership */
+    }
     await doLeave();
     router.push('/rooms');
   };

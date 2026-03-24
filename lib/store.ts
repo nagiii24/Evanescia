@@ -32,6 +32,8 @@ interface PlayerStore extends PlayerState {
   setCurrentTime: (currentTime: number) => void;
   /** Apply Convex room sync without touching history; triggers a one-shot seek in PlayerBar. */
   syncPlaybackFromRoom: (song: Song, positionSec: number, isPlaying: boolean) => void;
+  /** Stop playback and clear the current track (player bar hides). Does not clear liked/history. */
+  clearPlayer: () => void;
   oneShotSeekSeconds: number | null;
   // Liked songs
   likedSongs: Song[];
@@ -345,6 +347,18 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       playlistOnly: false,
       queue: [],
       oneShotSeekSeconds: positionSec,
+    });
+  },
+
+  clearPlayer: () => {
+    set({
+      currentSong: null,
+      isPlaying: false,
+      queue: [],
+      playlistOnly: false,
+      currentTime: 0,
+      duration: 0,
+      oneShotSeekSeconds: null,
     });
   },
 }));

@@ -4,6 +4,14 @@ import { getExistingUserIdOrNull, getUserId } from "./songs";
 
 const MAX_ROOM_NAME_LEN = 80;
 
+/** Membership rows older than this are treated as disconnected (closed tab, lost cleanup). Allow >1min tab throttle. */
+const LISTENER_PRESENCE_TTL_MS = 5 * 60 * 1000;
+
+function membershipLooksPresent(m: { joinedAt: number; lastSeenAt?: number }, now: number): boolean {
+  const last = m.lastSeenAt ?? m.joinedAt;
+  return now - last < LISTENER_PRESENCE_TTL_MS;
+}
+
 function baseSlugFromName(name: string): string {
   const raw = name
     .trim()
@@ -55,35 +63,61 @@ function occupantCountOrZero(r: { occupantCount?: number }): number {
   return r.occupantCount ?? 0;
 }
 
+/**
+ * True listener counts from membership rows (stored `occupantCount` on the room can drift).
+ */
+async function liveListenerCountMap(ctx: any): Promise<{
+  rooms: any[];
+  countByRoomId: Map<string, number>;
+}> {
+  const rooms = await ctx.db.query("listeningRooms").collect();
+  const countByRoomId = new Map<string, number>();
+  for (const r of rooms) {
+    countByRoomId.set(String(r._id), 0);
+  }
+  const now = Date.now();
+  const memberships = await ctx.db.query("listeningRoomMembers").collect();
+  for (const m of memberships) {
+    if (!membershipLooksPresent(m, now)) continue;
+    const id = String(m.roomId);
+    if (!countByRoomId.has(id)) continue;
+    countByRoomId.set(id, (countByRoomId.get(id) ?? 0) + 1);
+  }
+  return { rooms, countByRoomId };
+}
+
 export const listEmptyRooms = query({
   args: {},
   handler: async (ctx) => {
-    // Full table scan + filter: room count stays small; avoids index/order edge cases on deploys.
-    const rooms = await ctx.db.query("listeningRooms").collect();
-    return sortRoomsByCreatedAtDesc(rooms.filter((r) => occupantCountOrZero(r) === 0)).map(
-      (r) => ({
-        _id: r._id,
-        name: r.name,
-        slug: r.slug,
-        createdAt: r.createdAt,
-      }),
-    );
+    const { rooms, countByRoomId } = await liveListenerCountMap(ctx);
+    return sortRoomsByCreatedAtDesc(
+      rooms.filter((r) => (countByRoomId.get(String(r._id)) ?? 0) === 0),
+    ).map((r) => ({
+      _id: r._id,
+      name: r.name,
+      slug: r.slug,
+      createdAt: r.createdAt,
+    }));
   },
 });
 
 export const listRoomsDirectory = query({
   args: {},
   handler: async (ctx) => {
-    const all = await ctx.db.query("listeningRooms").collect();
-    const empty = sortRoomsByCreatedAtDesc(all.filter((r) => r.occupantCount === 0));
-    const occupied = sortRoomsByCreatedAtDesc(all.filter((r) => r.occupantCount > 0));
+    const { rooms, countByRoomId } = await liveListenerCountMap(ctx);
+    const empty = sortRoomsByCreatedAtDesc(
+      rooms.filter((r) => (countByRoomId.get(String(r._id)) ?? 0) === 0),
+    );
+    const occupied = sortRoomsByCreatedAtDesc(
+      rooms.filter((r) => (countByRoomId.get(String(r._id)) ?? 0) > 0),
+    );
 
-    const map = (r: (typeof all)[number]) => ({
+    const map = (r: (typeof rooms)[number]) => ({
       _id: r._id,
       name: r.name,
       slug: r.slug,
       createdAt: r.createdAt,
-      occupantCount: r.occupantCount,
+      occupantCount: countByRoomId.get(String(r._id)) ?? 0,
     });
 
     return {
@@ -103,11 +137,13 @@ export const getRoomWithMembersBySlug = query({
       .first();
     if (!room) return null;
 
-    const memberships = await ctx.db
+    const now = Date.now();
+    const allMemberships = await ctx.db
       .query("listeningRoomMembers")
       .withIndex("by_roomId", (q: any) => q.eq("roomId", room._id))
       .collect();
 
+    const memberships = allMemberships.filter((m) => membershipLooksPresent(m, now));
     memberships.sort((a, b) => a.joinedAt - b.joinedAt);
 
     const members: { userId: (typeof memberships)[number]["userId"]; name: string; joinedAt: number }[] = [];
@@ -146,8 +182,8 @@ export const getRoomWithMembersBySlug = query({
       name: room.name,
       slug: room.slug,
       createdAt: room.createdAt,
-      occupantCount: occupantCountOrZero(room),
-      /** Mirrors table rows; prefer this for display if it ever disagrees with occupantCount. */
+      /** Same as memberCount — from rows, not the cached field on `listeningRooms`. */
+      occupantCount: members.length,
       memberCount: members.length,
       members,
       playback,
@@ -223,6 +259,29 @@ export const syncRoomPlayback = mutation({
   },
 });
 
+/** Heartbeat while the room tab is open so listener counts stay accurate. */
+export const pingListeningRoom = mutation({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getUserId(ctx);
+    const room = await ctx.db
+      .query("listeningRooms")
+      .withIndex("by_slug", (q: any) => q.eq("slug", args.slug))
+      .first();
+    if (!room) return;
+
+    const membership = await ctx.db
+      .query("listeningRoomMembers")
+      .withIndex("by_room_user", (q: any) =>
+        q.eq("roomId", room._id).eq("userId", userId),
+      )
+      .first();
+
+    if (!membership) return;
+    await ctx.db.patch(membership._id, { lastSeenAt: Date.now() });
+  },
+});
+
 /** Current user’s Convex `users` id (for “you” in member lists). */
 export const getMyConvexUserId = query({
   args: {},
@@ -275,14 +334,17 @@ export const joinRoom = mutation({
       )
       .first();
 
+    const now = Date.now();
     if (existing) {
+      await ctx.db.patch(existing._id, { lastSeenAt: now });
       return { slug: room.slug };
     }
 
     await ctx.db.insert("listeningRoomMembers", {
       roomId: room._id,
       userId,
-      joinedAt: Date.now(),
+      joinedAt: now,
+      lastSeenAt: now,
     });
 
     await ctx.db.patch(room._id, {
