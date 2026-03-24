@@ -51,12 +51,16 @@ function sortRoomsByCreatedAtDesc<T extends { createdAt: number }>(rooms: T[]): 
   return [...rooms].sort((a, b) => b.createdAt - a.createdAt);
 }
 
+function occupantCountOrZero(r: { occupantCount?: number }): number {
+  return r.occupantCount ?? 0;
+}
+
 export const listEmptyRooms = query({
   args: {},
   handler: async (ctx) => {
     // Full table scan + filter: room count stays small; avoids index/order edge cases on deploys.
     const rooms = await ctx.db.query("listeningRooms").collect();
-    return sortRoomsByCreatedAtDesc(rooms.filter((r) => r.occupantCount === 0)).map(
+    return sortRoomsByCreatedAtDesc(rooms.filter((r) => occupantCountOrZero(r) === 0)).map(
       (r) => ({
         _id: r._id,
         name: r.name,
@@ -142,7 +146,7 @@ export const getRoomWithMembersBySlug = query({
       name: room.name,
       slug: room.slug,
       createdAt: room.createdAt,
-      occupantCount: room.occupantCount,
+      occupantCount: occupantCountOrZero(room),
       /** Mirrors table rows; prefer this for display if it ever disagrees with occupantCount. */
       memberCount: members.length,
       members,

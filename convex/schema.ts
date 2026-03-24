@@ -58,7 +58,8 @@ export default defineSchema({
     slug: v.string(),
     createdByUserId: v.id("users"),
     createdAt: v.number(),
-    occupantCount: v.number(),
+    /** Optional for legacy rows; treat as 0 when missing in code. */
+    occupantCount: v.optional(v.number()),
     /** Shared playback: wall-clock anchor so joiners can compute the same position. */
     playbackSongId: v.optional(v.string()),
     playbackTitle: v.optional(v.string()),
