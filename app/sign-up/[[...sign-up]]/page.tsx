@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { SignUp } from '@clerk/nextjs';
+import InAppBrowserAuthHint from '@/components/auth/InAppBrowserAuthHint';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,7 @@ export default function SignUpPage() {
         >
           ← Back to Evanescia
         </Link>
+        <InAppBrowserAuthHint />
         <SignUp
           routing="path"
           path="/sign-up"
