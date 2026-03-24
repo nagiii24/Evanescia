@@ -5,7 +5,11 @@ import { usePathname } from 'next/navigation';
 import { useMutation } from 'convex/react';
 import { usePlayerStore } from '@/lib/store';
 import { api } from '@/convex/_generated/api';
-import { parseRoomSlugFromPathname } from '@/lib/roomPlayback';
+import {
+  parseRoomSlugFromPathname,
+  ROOM_PLAYBACK_POSITION_INTERVAL_MS,
+  ROOM_PLAYBACK_SEEK_RETRY_DELAYS_MS,
+} from '@/lib/roomPlayback';
 import ReactPlayer from 'react-player';
 import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Plus } from 'lucide-react';
 import AudioVisualizer from './AudioVisualizer';
@@ -91,7 +95,7 @@ export default function PlayerBar() {
     const id = window.setInterval(() => {
       const { currentSong: s, currentTime: t, isPlaying: p } = usePlayerStore.getState();
       if (s && p) void pushRoomPlayback(s, t, true);
-    }, 4000);
+    }, ROOM_PLAYBACK_POSITION_INTERVAL_MS);
     return () => window.clearInterval(id);
   }, [roomSlug, currentSong?.id, currentSong, isPlaying, pushRoomPlayback]);
 
@@ -109,12 +113,12 @@ export default function PlayerBar() {
       }
     };
     run();
-    const id = window.setTimeout(run, 320);
-    const id2 = window.setTimeout(run, 900);
+    const timeoutIds = ROOM_PLAYBACK_SEEK_RETRY_DELAYS_MS.map((delay) =>
+      window.setTimeout(run, delay),
+    );
     return () => {
       cancelled = true;
-      window.clearTimeout(id);
-      window.clearTimeout(id2);
+      for (const t of timeoutIds) window.clearTimeout(t);
     };
   }, [oneShotSeekSeconds, youtubeUrl, setCurrentTime, currentSong?.id]);
 
