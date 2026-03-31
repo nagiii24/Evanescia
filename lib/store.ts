@@ -35,6 +35,8 @@ interface PlayerStore extends PlayerState {
   /** Stop playback and clear the current track (player bar hides). Does not clear liked/history. */
   clearPlayer: () => void;
   oneShotSeekSeconds: number | null;
+  /** Bumped each time syncPlaybackFromRoom runs; lets PlayerBar distinguish room-driven changes from user actions. */
+  _roomSyncNonce: number;
   // Liked songs
   likedSongs: Song[];
   setLikedSongs: (songs: Song[]) => void;
@@ -57,6 +59,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   duration: 0,
   currentTime: 0,
   oneShotSeekSeconds: null,
+  _roomSyncNonce: 0,
   history: [],
   likedSongs: [],
   onHistoryAdd: undefined,
@@ -340,14 +343,15 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
   syncPlaybackFromRoom: (song: Song, positionSec: number, isPlaying: boolean) => {
     if (!isValidSongId(song)) return;
-    set({
+    set((state) => ({
       currentSong: song,
       currentTime: positionSec,
       isPlaying,
       playlistOnly: false,
       queue: [],
       oneShotSeekSeconds: positionSec,
-    });
+      _roomSyncNonce: state._roomSyncNonce + 1,
+    }));
   },
 
   clearPlayer: () => {

@@ -2,9 +2,10 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { usePlayerStore } from '@/lib/store';
 import { api } from '@/convex/_generated/api';
+import { useConvexUserLinkState } from '@/lib/useConvexUserQueryReady';
 import {
   parseRoomSlugFromPathname,
   ROOM_PLAYBACK_POSITION_INTERVAL_MS,
@@ -57,10 +58,30 @@ export default function PlayerBar() {
 
   const pathname = usePathname();
   const roomSlug = parseRoomSlugFromPathname(pathname);
+  const link = useConvexUserLinkState();
+  const room = useQuery(
+    api.listeningRooms.getRoomWithMembersBySlug,
+    roomSlug && link.ready ? { slug: roomSlug } : 'skip',
+  );
+  const myConvexUserId = useQuery(
+    api.listeningRooms.getMyConvexUserId,
+    roomSlug && link.ready ? {} : 'skip',
+  );
   const syncRoomPlayback = useMutation(api.listeningRooms.syncRoomPlayback);
 
+  const shouldSendPeriodicRoomHeartbeat = useCallback((): boolean => {
+    if (!roomSlug || !link.ready) return false;
+    if (room === undefined || room === null) return false;
+    if (myConvexUserId === undefined) return false;
+    const pb = room.playback;
+    if (!pb?.song) return true;
+    const leader = pb.leaderUserId;
+    if (leader === undefined) return true;
+    return String(leader) === String(myConvexUserId);
+  }, [roomSlug, link.ready, room, myConvexUserId]);
+
   const pushRoomPlayback = useCallback(
-    async (song: Song, positionSec: number, playing: boolean) => {
+    async (song: Song, positionSec: number, playing: boolean, claimLead: boolean) => {
       if (!roomSlug) return;
       try {
         await syncRoomPlayback({
@@ -74,6 +95,7 @@ export default function PlayerBar() {
           },
           positionSec,
           isPlaying: playing,
+          claimLead,
         });
       } catch {
         /* not a member or offline */
@@ -82,22 +104,37 @@ export default function PlayerBar() {
     [roomSlug, syncRoomPlayback],
   );
 
-  // Publish on track / play-state change (not on every progress tick).
+  // Track nonce so we can tell when a store change came from room sync vs. user action.
+  const roomSyncNonceRef = useRef(usePlayerStore.getState()._roomSyncNonce);
+
+  // Publish on track / play-state change — but NOT when the change was caused by room sync.
   useEffect(() => {
     if (!roomSlug || !currentSong) return;
-    const { currentSong: s, currentTime: t, isPlaying: p } = usePlayerStore.getState();
-    if (!s) return;
-    void pushRoomPlayback(s, t, p);
+    const state = usePlayerStore.getState();
+    if (!state.currentSong) return;
+    if (state._roomSyncNonce !== roomSyncNonceRef.current) {
+      roomSyncNonceRef.current = state._roomSyncNonce;
+      return;
+    }
+    void pushRoomPlayback(state.currentSong, state.currentTime, state.isPlaying, true);
   }, [roomSlug, currentSong?.id, isPlaying, pushRoomPlayback, currentSong]);
 
   useEffect(() => {
     if (!roomSlug || !currentSong || !isPlaying) return;
     const id = window.setInterval(() => {
+      if (!shouldSendPeriodicRoomHeartbeat()) return;
       const { currentSong: s, currentTime: t, isPlaying: p } = usePlayerStore.getState();
-      if (s && p) void pushRoomPlayback(s, t, true);
+      if (s && p) void pushRoomPlayback(s, t, true, false);
     }, ROOM_PLAYBACK_POSITION_INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, [roomSlug, currentSong?.id, currentSong, isPlaying, pushRoomPlayback]);
+  }, [
+    roomSlug,
+    currentSong?.id,
+    currentSong,
+    isPlaying,
+    pushRoomPlayback,
+    shouldSendPeriodicRoomHeartbeat,
+  ]);
 
   // Room-synced seek: YouTube needs a moment after load.
   useEffect(() => {
@@ -182,7 +219,7 @@ export default function PlayerBar() {
     setIsSeeking(false);
     if (roomSlug) {
       const { currentSong: s, isPlaying: p } = usePlayerStore.getState();
-      if (s) void pushRoomPlayback(s, newTime, p);
+      if (s) void pushRoomPlayback(s, newTime, p, true);
     }
   };
 

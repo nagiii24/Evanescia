@@ -8,7 +8,11 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { searchYoutube } from '@/lib/youtube';
 import { usePlayerStore } from '@/lib/store';
-import { computeRoomPlaybackPosition } from '@/lib/roomPlayback';
+import {
+  computeRoomPlaybackPosition,
+  ROOM_PLAYBACK_SYNC_TOLERANCE_SEC,
+  ROOM_PLAYBACK_RESYNC_COOLDOWN_MS,
+} from '@/lib/roomPlayback';
 import type { Song } from '@/types';
 import { usePlaylists, usePlaylistSongs } from '@/components/hooks/usePlaylists';
 import { useConvexUserLinkState } from '@/lib/useConvexUserQueryReady';
@@ -73,7 +77,7 @@ export default function RoomPage() {
     }
   }, [slug, leaveRoom]);
 
-  // Join when the room exists; leave when you close the page or navigate away (avoids “ghost” listeners).
+  // Join when the room exists; leave when you close the page or navigate away (avoids "ghost" listeners).
   useEffect(() => {
     if (!slug || !link.ready || roomStatus !== 'ok') return;
 
@@ -90,7 +94,7 @@ export default function RoomPage() {
     };
   }, [slug, link.ready, roomStatus, joinRoom, leaveRoom]);
 
-  // Heartbeat so “ghost” membership from crashes doesn’t keep you “in the room” forever for listener counts.
+  // Heartbeat so "ghost" membership from crashes doesn't keep you "in the room" forever for listener counts.
   useEffect(() => {
     if (!slug || !link.ready || roomStatus !== 'ok') return;
     const ping = () => void pingListeningRoom({ slug }).catch(() => {});
@@ -109,7 +113,9 @@ export default function RoomPage() {
     hadRoomPlaybackRef.current = hasPlayback;
   }, [room, roomStatus, slug, clearPlayer]);
 
-  // Match the room’s shared playback (same track + position as whoever is driving the player).
+  const lastRoomSyncAtRef = useRef(0);
+
+  // Match the room's shared playback (same track + position as whoever is driving the player).
   useEffect(() => {
     if (roomStatus !== 'ok' || !room?.playback || room.serverNowMs === undefined) return;
     const pb = room.playback;
@@ -125,9 +131,15 @@ export default function RoomPage() {
     );
     const { currentSong, currentTime, isPlaying } = usePlayerStore.getState();
     const sameSong = currentSong?.id === pb.song.id;
-    if (sameSong && isPlaying === pb.isPlaying && Math.abs(currentTime - remotePos) < 3) {
-      return;
+
+    if (sameSong) {
+      const drift = Math.abs(currentTime - remotePos);
+      const playStateMatch = isPlaying === pb.isPlaying;
+      if (playStateMatch && drift < ROOM_PLAYBACK_SYNC_TOLERANCE_SEC) return;
+      if (drift < ROOM_PLAYBACK_SYNC_TOLERANCE_SEC && Date.now() - lastRoomSyncAtRef.current < ROOM_PLAYBACK_RESYNC_COOLDOWN_MS) return;
     }
+
+    lastRoomSyncAtRef.current = Date.now();
     syncPlaybackFromRoom(pb.song, remotePos, pb.isPlaying);
   }, [room, roomStatus, syncPlaybackFromRoom]);
 
@@ -168,7 +180,7 @@ export default function RoomPage() {
     return (
       <main className="min-h-screen text-gray-800 pb-24 pt-8 pl-0 md:pl-64">
         <div className="container mx-auto px-4 py-8">
-          <p className="text-gray-200">Loading…</p>
+          <p className="text-gray-200">Loading\u2026</p>
         </div>
       </main>
     );
@@ -179,7 +191,7 @@ export default function RoomPage() {
       <main className="min-h-screen text-gray-800 pb-24 pt-8 pl-0 md:pl-64">
         <div className="container mx-auto px-4 py-8 max-w-3xl">
           <Link href="/rooms" className="text-sm text-cyan-400 hover:text-cyan-300 mb-4 inline-block">
-            ← All rooms
+            \u2190 All rooms
           </Link>
           <h1 className="text-3xl font-bold text-white mb-4">Listening room</h1>
           <p className="text-gray-300">Sign in to enter a room and use your playlists or search.</p>
@@ -193,7 +205,7 @@ export default function RoomPage() {
       <main className="min-h-screen text-gray-800 pb-24 pt-8 pl-0 md:pl-64">
         <div className="container mx-auto px-4 py-8 flex items-center gap-2 text-gray-200">
           <Loader2 className="animate-spin" size={22} />
-          Loading room…
+          Loading room\u2026
         </div>
       </main>
     );
@@ -232,7 +244,7 @@ export default function RoomPage() {
               <span className="min-w-0 break-words">{room.name}</span>
             </h1>
             <p className="text-gray-400 text-sm mt-1">
-              {room.memberCount} in this room · Playback is shared: everyone hears the same track and position while
+              {room.memberCount} in this room &middot; Playback is shared: everyone hears the same track and position while
               someone is playing from this room page.
             </p>
           </div>
@@ -251,7 +263,7 @@ export default function RoomPage() {
             Here now
           </h2>
           {room.members.length === 0 ? (
-            <p className="text-gray-400 text-sm">No one&apos;s listed yet—joining…</p>
+            <p className="text-gray-400 text-sm">No one&apos;s listed yet\u2014joining\u2026</p>
           ) : (
             <ul className="flex flex-wrap gap-2">
               {room.members.map((m) => {
@@ -333,7 +345,7 @@ export default function RoomPage() {
                     )}
                   </div>
                   {songsLoading ? (
-                    <p className="text-gray-400 text-sm">Loading tracks…</p>
+                    <p className="text-gray-400 text-sm">Loading tracks\u2026</p>
                   ) : songs.length === 0 ? (
                     <p className="text-gray-400 text-sm">This playlist is empty.</p>
                   ) : (
@@ -382,7 +394,7 @@ export default function RoomPage() {
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Type a song or artist…"
+              placeholder="Type a song or artist\u2026"
               className="flex-1 min-w-[200px] px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/15 text-white placeholder:text-gray-500"
             />
             <button

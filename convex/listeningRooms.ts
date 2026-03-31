@@ -174,6 +174,7 @@ export const getRoomWithMembersBySlug = query({
             positionSec: room.playbackPositionSec,
             isPlaying: room.playbackIsPlaying ?? false,
             updatedAt: room.playbackUpdatedAt ?? 0,
+            leaderUserId: room.playbackLeaderUserId,
           }
         : null;
 
@@ -207,6 +208,8 @@ export const syncRoomPlayback = mutation({
     isPlaying: v.boolean(),
     song: v.optional(roomSongValidator),
     clear: v.optional(v.boolean()),
+    /** True for track / play-pause / seek; false for periodic position heartbeats from the leader only. */
+    claimLead: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getUserId(ctx);
@@ -237,12 +240,22 @@ export const syncRoomPlayback = mutation({
         playbackPositionSec: undefined,
         playbackIsPlaying: undefined,
         playbackUpdatedAt: undefined,
+        playbackLeaderUserId: undefined,
       });
       return;
     }
 
     if (!args.song) {
       throw new Error("song is required unless clear is true");
+    }
+
+    const songChanged = args.song.id !== room.playbackSongId;
+    const leaderId = room.playbackLeaderUserId;
+    const claimLead = args.claimLead === true;
+    const isLeader = leaderId === undefined || leaderId === userId;
+
+    if (!songChanged && leaderId !== undefined && leaderId !== userId && !claimLead) {
+      return;
     }
 
     await ctx.db.patch(room._id, {
@@ -255,6 +268,7 @@ export const syncRoomPlayback = mutation({
       playbackPositionSec: args.positionSec,
       playbackIsPlaying: args.isPlaying,
       playbackUpdatedAt: now,
+      playbackLeaderUserId: userId,
     });
   },
 });
