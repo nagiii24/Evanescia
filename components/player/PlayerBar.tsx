@@ -12,7 +12,7 @@ import {
   ROOM_PLAYBACK_SEEK_RETRY_DELAYS_MS,
 } from '@/lib/roomPlayback';
 import ReactPlayer from 'react-player';
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Plus } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Plus, X } from 'lucide-react';
 import AudioVisualizer from './AudioVisualizer';
 import { usePlaylists } from '@/components/hooks/usePlaylists';
 import { useUser } from '@clerk/nextjs';
@@ -45,6 +45,7 @@ export default function PlayerBar() {
     setDuration,
     setCurrentTime,
     oneShotSeekSeconds,
+    clearPlayer,
   } = usePlayerStore();
 
   const isValidYoutubeId =
@@ -471,6 +472,15 @@ export default function PlayerBar() {
         <div className="ml-4 relative">
           <AddToPlaylistButton currentSong={currentSong} />
         </div>
+
+        {/* Close / stop playing */}
+        <button
+          onClick={clearPlayer}
+          className="ml-2 p-2 text-sakura-deep hover:text-red-500 transition-colors rounded-full"
+          aria-label="Stop playing"
+        >
+          <X size={18} />
+        </button>
       </div>
     </div>
   );
