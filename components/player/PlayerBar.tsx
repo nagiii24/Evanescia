@@ -12,8 +12,9 @@ import {
   ROOM_PLAYBACK_SEEK_RETRY_DELAYS_MS,
 } from '@/lib/roomPlayback';
 import ReactPlayer from 'react-player';
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Plus, X } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Plus, X, ListMusic } from 'lucide-react';
 import AudioVisualizer from './AudioVisualizer';
+import QueuePanel from './QueuePanel';
 import { usePlaylists } from '@/components/hooks/usePlaylists';
 import { useUser } from '@clerk/nextjs';
 import type { Song } from '@/types';
@@ -29,6 +30,7 @@ export default function PlayerBar() {
   const playerRef = useRef<ReactPlayer>(null);
   const [isSeeking, setIsSeeking] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(false);
   
   const {
     currentSong,
@@ -461,12 +463,24 @@ export default function PlayerBar() {
           />
         </div>
 
-        {/* Queue indicator (optional) */}
-        {queue.length > 0 && (
-          <div className="text-sakura-deep text-sm ml-4 text-gray-800 hidden md:block">
-            {queue.length} in queue
-          </div>
-        )}
+        {/* Queue toggle */}
+        <div className="ml-4 relative">
+          <button
+            onClick={() => setQueueOpen((v) => !v)}
+            className={`p-2 transition-colors rounded-full flex items-center gap-1 ${
+              queueOpen
+                ? 'text-sakura-primary'
+                : 'text-sakura-deep hover:text-sakura-primary'
+            }`}
+            aria-label="Toggle queue"
+          >
+            <ListMusic size={18} />
+            {queue.length > 0 && (
+              <span className="text-xs font-medium">{queue.length}</span>
+            )}
+          </button>
+          {queueOpen && <QueuePanel onClose={() => setQueueOpen(false)} />}
+        </div>
 
         {/* Add to playlist (+) */}
         <div className="ml-4 relative">

@@ -32,6 +32,12 @@ interface PlayerStore extends PlayerState {
   setCurrentTime: (currentTime: number) => void;
   /** Apply Convex room sync without touching history; triggers a one-shot seek in PlayerBar. */
   syncPlaybackFromRoom: (song: Song, positionSec: number, isPlaying: boolean) => void;
+  /** Remove a song from the queue by index. */
+  removeFromQueue: (index: number) => void;
+  /** Move a song in the queue from one index to another. */
+  moveInQueue: (fromIndex: number, toIndex: number) => void;
+  /** Jump to a specific queue item, removing it from the queue and making it the current song. */
+  playFromQueue: (index: number) => void;
   /** Stop playback and clear the current track (player bar hides). Does not clear liked/history. */
   clearPlayer: () => void;
   oneShotSeekSeconds: number | null;
@@ -352,6 +358,50 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       oneShotSeekSeconds: positionSec,
       _roomSyncNonce: state._roomSyncNonce + 1,
     }));
+  },
+
+  removeFromQueue: (index: number) => {
+    set((state) => {
+      const queue = [...state.queue];
+      if (index < 0 || index >= queue.length) return state;
+      queue.splice(index, 1);
+      return { queue };
+    });
+  },
+
+  moveInQueue: (fromIndex: number, toIndex: number) => {
+    set((state) => {
+      const queue = [...state.queue];
+      if (
+        fromIndex < 0 || fromIndex >= queue.length ||
+        toIndex < 0 || toIndex >= queue.length ||
+        fromIndex === toIndex
+      ) return state;
+      const [item] = queue.splice(fromIndex, 1);
+      queue.splice(toIndex, 0, item);
+      return { queue };
+    });
+  },
+
+  playFromQueue: (index: number) => {
+    const { queue, currentSong, onHistoryAdd, history } = get();
+    if (index < 0 || index >= queue.length) return;
+    const song = queue[index];
+    const newQueue = [...queue];
+    newQueue.splice(index, 1);
+
+    if (currentSong) {
+      const newHistory = [currentSong, ...history.filter(s => s.id !== currentSong.id)].slice(0, 100);
+      set({ history: newHistory });
+      if (onHistoryAdd) onHistoryAdd(currentSong);
+    }
+
+    set({
+      currentSong: song,
+      queue: newQueue,
+      isPlaying: true,
+      currentTime: 0,
+    });
   },
 
   clearPlayer: () => {
