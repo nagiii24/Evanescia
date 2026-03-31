@@ -70,6 +70,8 @@ export default defineSchema({
     playbackPositionSec: v.optional(v.number()),
     playbackIsPlaying: v.optional(v.boolean()),
     playbackUpdatedAt: v.optional(v.number()),
+    /** Only this user’s periodic position updates apply; others follow without clobbering the clock. */
+    playbackLeaderUserId: v.optional(v.id("users")),
   }).index("by_slug", ["slug"]),
 
   listeningRoomMembers: defineTable({

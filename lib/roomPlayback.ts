@@ -1,8 +1,14 @@
-/** How often the DJ publishes position while playing (lower = followers stay closer in time; more Convex writes). */
-export const ROOM_PLAYBACK_POSITION_INTERVAL_MS = 700;
+/** How often the leader publishes position while playing. */
+export const ROOM_PLAYBACK_POSITION_INTERVAL_MS = 3_000;
 
-/** Extra YouTube seek attempts after load (ms). Keep small to reduce join/ skip latency. */
-export const ROOM_PLAYBACK_SEEK_RETRY_DELAYS_MS = [80, 220] as const;
+/** Extra YouTube seek attempts after load (ms). Keep small to reduce join/skip latency. */
+export const ROOM_PLAYBACK_SEEK_RETRY_DELAYS_MS = [80, 300] as const;
+
+/** Followers ignore drift below this threshold to avoid unnecessary seeks (seeks cause buffer stutter). */
+export const ROOM_PLAYBACK_SYNC_TOLERANCE_SEC = 5;
+
+/** After a room-sync seek, ignore further re-syncs for this many ms (gives YouTube time to buffer). */
+export const ROOM_PLAYBACK_RESYNC_COOLDOWN_MS = 5_000;
 
 /** Compute track position from server anchor + query snapshot time. */
 export function computeRoomPlaybackPosition(
