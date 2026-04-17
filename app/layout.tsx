@@ -10,6 +10,7 @@ import LikedSongsSync from "@/components/layout/LikedSongsSync";
 import SakuraDrop from "@/components/ui/SakuraDrop";
 import ErrorLogger from "@/components/ErrorLogger";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { SystemHealthProvider } from "@/components/system-health/SystemHealthProvider";
 import { Playfair_Display } from "next/font/google";
 
 const playfair = Playfair_Display({
@@ -63,16 +64,22 @@ export default function RootLayout({
           signUpFallbackRedirectUrl="/"
         >
           <ConvexClientProvider>
-            <LofiBackground />
-            <SakuraDrop />
-            <NavBar />
-            <HeaderAuth />
-            <ErrorBoundary>
-              <LikedSongsSync />
-              {children}
-              <PlayerBar />
-            </ErrorBoundary>
-            <ErrorLogger />
+            {/* SystemHealthProvider sits ABOVE ErrorBoundary so load-shedding
+                decisions keep working even if a downstream tree crashes. It sits
+                INSIDE ClerkProvider because auth failures are a legitimate input
+                to future health signals. */}
+            <SystemHealthProvider>
+              <LofiBackground />
+              <SakuraDrop />
+              <NavBar />
+              <HeaderAuth />
+              <ErrorBoundary>
+                <LikedSongsSync />
+                {children}
+                <PlayerBar />
+              </ErrorBoundary>
+              <ErrorLogger />
+            </SystemHealthProvider>
           </ConvexClientProvider>
         </ClerkProvider>
       </body>
