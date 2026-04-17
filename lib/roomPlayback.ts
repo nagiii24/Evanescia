@@ -1,14 +1,18 @@
 /** How often the leader publishes position while playing. */
-export const ROOM_PLAYBACK_POSITION_INTERVAL_MS = 3_000;
+export const ROOM_PLAYBACK_POSITION_INTERVAL_MS = 2_000;
 
 /** Extra YouTube seek attempts after load (ms). Keep small to reduce join/skip latency. */
 export const ROOM_PLAYBACK_SEEK_RETRY_DELAYS_MS = [80, 300] as const;
 
-/** Followers ignore drift below this threshold to avoid unnecessary seeks (seeks cause buffer stutter). */
-export const ROOM_PLAYBACK_SYNC_TOLERANCE_SEC = 5;
+/**
+ * Followers ignore drift below this threshold to avoid unnecessary seeks (seeks cause buffer stutter).
+ * Kept tight so fixed offsets introduced by YouTube startup / seek-retry warmup get corrected quickly;
+ * otherwise listeners hear a permanent lag that feels like the track is playing at a different speed.
+ */
+export const ROOM_PLAYBACK_SYNC_TOLERANCE_SEC = 1.5;
 
-/** After a room-sync seek, ignore further re-syncs for this many ms (gives YouTube time to buffer). */
-export const ROOM_PLAYBACK_RESYNC_COOLDOWN_MS = 5_000;
+/** After a room-sync seek, ignore further drift-only re-syncs for this many ms (gives YouTube time to buffer). */
+export const ROOM_PLAYBACK_RESYNC_COOLDOWN_MS = 3_000;
 
 /** Compute track position from server anchor + query snapshot time. */
 export function computeRoomPlaybackPosition(

@@ -114,12 +114,20 @@ export default function RoomPage() {
   }, [room, roomStatus, slug, clearPlayer]);
 
   const lastRoomSyncAtRef = useRef(0);
+  // Estimated difference between the Convex server clock and this client's Date.now(),
+  // refreshed every query snapshot so we can project the leader's position to "right now"
+  // instead of to whatever server time the snapshot was taken at. Without this, follower
+  // seeks land behind by however long Convex delivery + React render took.
+  const serverClockOffsetMsRef = useRef(0);
 
   // Match the room's shared playback (same track + position as whoever is driving the player).
   useEffect(() => {
     if (roomStatus !== 'ok' || !room?.playback || room.serverNowMs === undefined) return;
     const pb = room.playback;
     if (!pb?.song?.id) return;
+
+    serverClockOffsetMsRef.current = room.serverNowMs - Date.now();
+    const projectedServerNowMs = Date.now() + serverClockOffsetMsRef.current;
     const remotePos = computeRoomPlaybackPosition(
       {
         anchorMs: pb.anchorMs,
@@ -127,16 +135,19 @@ export default function RoomPage() {
         isPlaying: pb.isPlaying,
         song: pb.song,
       },
-      room.serverNowMs,
+      projectedServerNowMs,
     );
     const { currentSong, currentTime, isPlaying } = usePlayerStore.getState();
     const sameSong = currentSong?.id === pb.song.id;
 
-    if (sameSong) {
+    // Play/pause transitions must propagate immediately — applying a cooldown here would
+    // make a follower keep playing for several seconds after the leader pauses.
+    const playStateChanged = sameSong && isPlaying !== pb.isPlaying;
+    if (sameSong && !playStateChanged) {
       const drift = Math.abs(currentTime - remotePos);
-      const playStateMatch = isPlaying === pb.isPlaying;
-      if (playStateMatch && drift < ROOM_PLAYBACK_SYNC_TOLERANCE_SEC) return;
-      if (drift < ROOM_PLAYBACK_SYNC_TOLERANCE_SEC && Date.now() - lastRoomSyncAtRef.current < ROOM_PLAYBACK_RESYNC_COOLDOWN_MS) return;
+      if (drift < ROOM_PLAYBACK_SYNC_TOLERANCE_SEC) return;
+      // Only the drift-only reseek path respects the cooldown (seeks cause YouTube buffer stutter).
+      if (Date.now() - lastRoomSyncAtRef.current < ROOM_PLAYBACK_RESYNC_COOLDOWN_MS) return;
     }
 
     lastRoomSyncAtRef.current = Date.now();
