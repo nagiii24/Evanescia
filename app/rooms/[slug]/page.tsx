@@ -16,6 +16,7 @@ import {
 import type { Song } from '@/types';
 import { usePlaylists, usePlaylistSongs } from '@/components/hooks/usePlaylists';
 import { useConvexUserLinkState } from '@/lib/useConvexUserQueryReady';
+import { ShedableArea } from '@/components/system-health/ShedableArea';
 import { ArrowLeft, DoorOpen, Loader2, Play, Search, Shuffle, Users } from 'lucide-react';
 
 function formatDuration(seconds: number): string {
@@ -268,6 +269,27 @@ export default function RoomPage() {
           </button>
         </div>
 
+        {/* SRE: the three sections below are the "collaborative surface" —
+            live presence, playlist browsing, search. All three run Convex
+            subscriptions + YouTube API calls. At RED we unmount them entirely
+            so the Convex queries are cancelled, sockets released, and the
+            backend can breathe. Music playback (via <PlayerBar />) continues
+            uninterrupted because it lives in the root layout, not here. */}
+        <ShedableArea
+          minStatus="YELLOW"
+          fallback={
+            <section className="mb-6 p-4 rounded-xl bg-black/35 border border-red-500/40 backdrop-blur-md">
+              <h2 className="text-lg font-semibold text-white mb-2">
+                Collaborative features paused
+              </h2>
+              <p className="text-gray-300 text-sm">
+                We&apos;re shedding non-essential features to keep playback smooth.
+                Your queue will continue to play. Live presence, playlist browsing,
+                and search will return automatically when the system recovers.
+              </p>
+            </section>
+          }
+        >
         <section className="mb-6 p-4 rounded-xl bg-black/35 border border-white/10 backdrop-blur-md">
           <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
             <Users size={20} className="text-pink-300" />
@@ -452,6 +474,7 @@ export default function RoomPage() {
             </ul>
           )}
         </section>
+        </ShedableArea>
       </div>
     </main>
   );

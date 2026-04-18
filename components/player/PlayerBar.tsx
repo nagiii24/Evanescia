@@ -17,6 +17,8 @@ import AudioVisualizer from './AudioVisualizer';
 import QueuePanel from './QueuePanel';
 import { usePlaylists } from '@/components/hooks/usePlaylists';
 import { useUser } from '@clerk/nextjs';
+import { useLoadShedding } from '@/components/system-health/useLoadShedding';
+import { getAdaptiveThumbnail } from '@/lib/imageQuality';
 import type { Song } from '@/types';
 
 function formatTime(seconds: number): string {
@@ -31,6 +33,11 @@ export default function PlayerBar() {
   const [isSeeking, setIsSeeking] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
+
+  // SRE: load-shedding flags only drive *decorative* aspects of the player.
+  // They MUST NOT gate `react-player` mounting, audio-element creation, or any
+  // playback control logic. The audio path stays isolated from health signals.
+  const { mode: qualityMode, allowAnimations } = useLoadShedding();
   
   const {
     currentSong,
@@ -368,8 +375,8 @@ export default function PlayerBar() {
         </div>
       ) : null}
 
-      {/* Audio Visualizer */}
-      <AudioVisualizer />
+      {/* Audio Visualizer — decorative; shed when animations are off. */}
+      {allowAnimations ? <AudioVisualizer /> : null}
 
       {/* Progress Bar */}
       <div className="px-4 pb-2">
@@ -403,9 +410,11 @@ export default function PlayerBar() {
         {/* Song Info */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <img
-            src={currentSong.thumbnailUrl}
+            src={getAdaptiveThumbnail(currentSong.thumbnailUrl, qualityMode)}
             alt={currentSong.title}
             className="w-12 h-12 rounded object-cover border border-sakura-primary/30"
+            loading="lazy"
+            decoding="async"
           />
           <div className="flex flex-col min-w-0">
             <p className="text-gray-800 font-medium truncate">{currentSong.title}</p>
@@ -428,7 +437,12 @@ export default function PlayerBar() {
             onClick={handlePlayPauseClick}
             className="p-2 bg-gradient-to-r from-sakura-deep to-sakura-primary backdrop-blur-sm text-white rounded-full hover:from-sakura-deep/90 hover:to-sakura-primary/90 transition-all border border-sakura-primary/50 shadow-[0_0_15px_rgba(255,183,197,0.6)] hover:ring-2 hover:ring-gold-accent/50 active:scale-95"
             aria-label={isPlaying ? 'Pause' : 'Play'}
-            style={{ animation: isPlaying ? 'sakuraGlow 2s ease-in-out infinite' : 'none', WebkitTapHighlightColor: 'transparent' }}
+            style={{
+              // Shed the decorative glow animation under YELLOW/RED.
+              // Play/pause remains fully functional; only the visual flourish drops.
+              animation: isPlaying && allowAnimations ? 'sakuraGlow 2s ease-in-out infinite' : 'none',
+              WebkitTapHighlightColor: 'transparent',
+            }}
           >
             {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
           </button>

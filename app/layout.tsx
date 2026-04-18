@@ -11,6 +11,8 @@ import SakuraDrop from "@/components/ui/SakuraDrop";
 import ErrorLogger from "@/components/ErrorLogger";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { SystemHealthProvider } from "@/components/system-health/SystemHealthProvider";
+import { LowBandwidthBanner } from "@/components/system-health/LowBandwidthBanner";
+import { ShedableArea } from "@/components/system-health/ShedableArea";
 import { Playfair_Display } from "next/font/google";
 
 const playfair = Playfair_Display({
@@ -69,13 +71,22 @@ export default function RootLayout({
                 INSIDE ClerkProvider because auth failures are a legitimate input
                 to future health signals. */}
             <SystemHealthProvider>
+              {/* Banner renders only in RED — zero cost in normal operation. */}
+              <LowBandwidthBanner />
               <LofiBackground />
-              <SakuraDrop />
+              {/* Decorative sakura petals: animations are pure GPU load with
+                  zero functional value. Shed at YELLOW (and therefore RED). */}
+              <ShedableArea minStatus="GREEN">
+                <SakuraDrop />
+              </ShedableArea>
               <NavBar />
               <HeaderAuth />
               <ErrorBoundary>
                 <LikedSongsSync />
                 {children}
+                {/* PlayerBar is ALWAYS mounted. It must not read load-shedding
+                    flags in a way that affects audio output — music is our
+                    one sacred feature. */}
                 <PlayerBar />
               </ErrorBoundary>
               <ErrorLogger />

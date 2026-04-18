@@ -9,7 +9,11 @@
     "dev": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "chaos": "node chaos-test.js",
+    "chaos:transitions": "node chaos-test.js --mode transitions --duration 240",
+    "chaos:burst": "node chaos-test.js --mode burst --concurrency 50 --duration 30",
+    "chaos:ramp": "node chaos-test.js --mode ramp --concurrency 30 --duration 60"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.7",
